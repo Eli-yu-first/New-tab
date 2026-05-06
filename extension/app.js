@@ -1022,6 +1022,25 @@ function renderHistoryGroups(groups) {
  * renderSavedTabs — 渲染 Saved for later 的标签页
  */
 function renderSavedTabs(savedTabs) {
+  // 格式化保存时间（与 History 一致）
+  function formatSavedTime(savedAt) {
+    if (!savedAt) return '';
+    const date = new Date(savedAt);
+    const now = new Date();
+    const diffMs = now - date;
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMs / 3600000);
+
+    if (diffMins < 1)   return '刚刚';
+    if (diffMins < 60)  return `${diffMins} 分钟前`;
+    if (diffHours < 24) return `${diffHours} 小时前`;
+
+    if (date.getFullYear() === now.getFullYear()) {
+      return `${date.getMonth() + 1}/${date.getDate()} ${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
+    }
+    return `${date.getFullYear()}/${date.getMonth() + 1}/${date.getDate()}`;
+  }
+
   const pageChips = savedTabs.map((tab) => {
     let label = cleanTitle(smartTitle(stripTitleNoise(tab.title || ''), tab.url), '');
     const safeUrl = (tab.url || '').replace(/"/g, '&quot;');
@@ -1030,10 +1049,12 @@ function renderSavedTabs(savedTabs) {
     let domain = '';
     try { domain = new URL(tab.url).hostname; } catch {}
     const faviconUrl = domain ? `https://www.google.com/s2/favicons?domain=${domain}&sz=16` : '';
+    const timeStr = formatSavedTime(tab.savedAt);
 
-    return `<div class="page-chip clickable" data-action="focus-tab" data-tab-url="${safeUrl}" title="${safeTitle}">
+    return `<div class="page-chip clickable saved-chip" data-action="focus-tab" data-tab-url="${safeUrl}" title="${safeTitle}">
       ${faviconUrl ? `<img class="chip-favicon" src="${faviconUrl}" alt="" onerror="this.style.display='none'">` : ''}
       <span class="chip-text">${label}</span>
+      <span class="saved-time">${timeStr}</span>
       <div class="chip-actions">
         <button class="chip-action chip-delete" data-action="dismiss-saved" data-tab-id="${safeId}" title="Remove">
           <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>

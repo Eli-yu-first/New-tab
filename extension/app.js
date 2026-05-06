@@ -1030,9 +1030,6 @@ function renderSavedTabs(savedTabs) {
       ${faviconUrl ? `<img class="chip-favicon" src="${faviconUrl}" alt="" onerror="this.style.display='none'">` : ''}
       <span class="chip-text">${label}</span>
       <div class="chip-actions">
-        <button class="chip-action chip-save" data-action="check-off-saved" data-tab-id="${safeId}" title="Mark as done">
-          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 1 1-18 0 9 9 0 0 1 18 0z" /></svg>
-        </button>
         <button class="chip-action chip-delete" data-action="dismiss-saved" data-tab-id="${safeId}" title="Remove">
           <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
         </button>

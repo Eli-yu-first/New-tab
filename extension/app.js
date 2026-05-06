@@ -1933,4 +1933,28 @@ document.addEventListener('DOMContentLoaded', () => {
       reader.readAsText(file);
     });
   }
+
+  // --- 实时监听标签页变化，自动刷新控制台 ---
+  let refreshTimer = null;
+  function debouncedRefresh() {
+    if (refreshTimer) clearTimeout(refreshTimer);
+    refreshTimer = setTimeout(() => {
+      renderDashboard();
+    }, 300);
+  }
+
+  if (chrome.tabs && chrome.tabs.onRemoved) {
+    chrome.tabs.onRemoved.addListener(debouncedRefresh);
+  }
+  if (chrome.tabs && chrome.tabs.onCreated) {
+    chrome.tabs.onCreated.addListener(debouncedRefresh);
+  }
+  if (chrome.tabs && chrome.tabs.onUpdated) {
+    chrome.tabs.onUpdated.addListener((tabId, changeInfo) => {
+      // 仅在页面加载完成时刷新，避免加载过程中频繁触发
+      if (changeInfo.status === 'complete') {
+        debouncedRefresh();
+      }
+    });
+  }
 });

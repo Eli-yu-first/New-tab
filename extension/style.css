@@ -81,6 +81,86 @@ header {
   text-transform: uppercase;
 }
 
+/* ---- Top Search Bar ---- */
+.top-search-bar {
+  margin-bottom: 24px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--warm-gray);
+}
+
+.search-container {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 600px;
+  margin: 0 auto;
+}
+
+.search-engine-select {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 13px;
+  padding: 10px 16px;
+  border: 1px solid var(--warm-gray);
+  border-radius: 8px;
+  background: var(--card-bg);
+  color: var(--ink);
+  cursor: pointer;
+  outline: none;
+  transition: border-color 0.2s;
+  flex-shrink: 0;
+}
+
+.search-engine-select:focus {
+  border-color: var(--accent-amber);
+}
+
+.search-input {
+  flex: 1;
+  font-family: 'DM Sans', sans-serif;
+  font-size: 14px;
+  padding: 10px 16px;
+  border: 1px solid var(--warm-gray);
+  border-radius: 8px;
+  background: var(--card-bg);
+  color: var(--ink);
+  outline: none;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.search-input:focus {
+  border-color: var(--accent-amber);
+  box-shadow: 0 0 0 3px rgba(200, 113, 58, 0.08);
+}
+
+.search-input::placeholder {
+  color: var(--muted);
+}
+
+.search-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border: 1px solid var(--warm-gray);
+  border-radius: 8px;
+  background: var(--card-bg);
+  color: var(--muted);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.search-btn:hover {
+  background: var(--accent-amber);
+  border-color: var(--accent-amber);
+  color: white;
+}
+
+.search-btn svg {
+  width: 18px;
+  height: 18px;
+}
+
 /* ---- Tab cleanup banner ---- */
 .tab-cleanup-banner {
   background: linear-gradient(135deg, rgba(200, 113, 58, 0.04), rgba(200, 113, 58, 0.09));
@@ -214,6 +294,103 @@ header {
   font-weight: 500;
   letter-spacing: 0.5px;
   white-space: nowrap;
+}
+
+.section-search {
+  margin-left: auto;
+}
+
+.add-bookmark-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--warm-gray);
+  border-radius: 6px;
+  background: var(--card-bg);
+  color: var(--muted);
+  cursor: pointer;
+  transition: all 0.2s;
+  margin-left: 8px;
+}
+
+.add-bookmark-btn:hover {
+  background: var(--accent-sage);
+  border-color: var(--accent-sage);
+  color: white;
+}
+
+.add-bookmark-btn svg {
+  width: 14px;
+  height: 14px;
+}
+
+/* Bookmark Sort Buttons */
+.chip-sort {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.sort-btn {
+  width: 20px;
+  height: 14px;
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  padding: 0;
+  border-radius: 3px;
+  transition: all 0.15s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.sort-btn:hover {
+  background: rgba(139, 195, 74, 0.25);
+  color: var(--accent-sage);
+}
+
+.sort-btn svg {
+  width: 11px;
+  height: 11px;
+}
+
+/* Bookmark Delete Button */
+.chip-delete {
+  color: var(--muted) !important;
+  background: transparent !important;
+  border: none !important;
+}
+
+.chip-delete:hover {
+  color: #e53935 !important;
+  background: rgba(229, 57, 53, 0.1) !important;
+}
+
+
+
+.tab-search-input {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 12px;
+  padding: 6px 12px;
+  border: 1px solid var(--warm-gray);
+  border-radius: 6px;
+  background: var(--card-bg);
+  color: var(--ink);
+  outline: none;
+  transition: border-color 0.2s;
+  width: 150px;
+}
+
+.tab-search-input:focus {
+  border-color: var(--accent-amber);
+}
+
+.tab-search-input::placeholder {
+  color: var(--muted);
 }
 
 /* ---- Mission Cards ---- */
@@ -420,35 +597,50 @@ header {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  background: none;
-  border: none;
+  background: rgba(154, 145, 138, 0.08);
+  border: 1px solid rgba(154, 145, 138, 0.15);
   color: var(--muted);
   cursor: pointer;
-  padding: 4px;
-  border-radius: 4px;
-  opacity: 0.35;
-  transition: opacity 0.15s, color 0.15s, background 0.15s;
+  padding: 6px;
+  border-radius: 6px;
+  opacity: 1;
+  transition: all 0.2s;
   flex-shrink: 0;
 }
 
 .chip-action svg {
-  width: 15px;
-  height: 15px;
+  width: 16px;
+  height: 16px;
 }
 
 .chip-action:hover {
-  opacity: 1;
-  background: rgba(154, 145, 138, 0.1);
+  transform: translateY(-1px);
+}
+
+.chip-save {
+  color: var(--accent-sage);
+  background: rgba(90, 122, 98, 0.08);
+  border-color: rgba(90, 122, 98, 0.2);
 }
 
 .chip-save:hover {
-  color: var(--accent-sage);
-  background: rgba(90, 122, 98, 0.08);
+  color: white;
+  background: var(--accent-sage);
+  border-color: var(--accent-sage);
+  box-shadow: 0 2px 8px rgba(90, 122, 98, 0.3);
+}
+
+.chip-close {
+  color: var(--status-abandoned);
+  background: rgba(179, 90, 90, 0.08);
+  border-color: rgba(179, 90, 90, 0.2);
 }
 
 .chip-close:hover {
-  color: var(--status-abandoned);
-  background: rgba(179, 90, 90, 0.08);
+  color: white;
+  background: var(--status-abandoned);
+  border-color: var(--status-abandoned);
+  box-shadow: 0 2px 8px rgba(179, 90, 90, 0.3);
 }
 
 .page-chip.clickable {
@@ -888,37 +1080,27 @@ footer { animation: fadeUp 0.5s ease 0.65s both; }
    SAVED FOR LATER — Checklist Column + Archive
    ================================================================ */
 
-/* ---- Two-column layout ---- */
+/* ---- Three-column layout ---- */
 .dashboard-columns {
   display: flex;
-  gap: 32px;
+  gap: 24px;
   align-items: flex-start;
 }
 
-/* Open tabs column keeps the grid layout */
-.dashboard-columns .active-section {
+/* Tab columns */
+.tab-column {
   flex: 1;
-  min-width: 600px;
-}
-
-/* Saved for later column — fixed width on the right, scrolls independently */
-.deferred-column {
-  width: 280px;
-  flex-shrink: 0;
-  position: sticky;
-  top: 32px;
-  max-height: calc(100vh - 64px);
-  overflow-y: auto;
+  min-width: 280px;
+  max-width: 360px;
 }
 
 /* On narrow screens, stack vertically */
-@media (max-width: 800px) {
+@media (max-width: 1000px) {
   .dashboard-columns {
     flex-direction: column;
   }
-  .deferred-column {
-    width: 100%;
-    position: static;
+  .tab-column {
+    max-width: 100%;
   }
 }
 
@@ -1155,4 +1337,93 @@ footer { animation: fadeUp 0.5s ease 0.65s both; }
   color: var(--muted);
   opacity: 0.6;
   flex-shrink: 0;
+}
+
+.minimal-close-btn {
+  background: transparent;
+  border: none;
+  color: var(--muted);
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+  margin-left: auto;
+}
+
+.minimal-close-btn:hover {
+  background: rgba(179, 90, 90, 0.1);
+  color: var(--status-abandoned);
+}
+
+.minimal-close-btn svg {
+  width: 14px;
+  height: 14px;
+}
+
+/* ---- Custom Bookmark Modal ---- */
+.modal-overlay {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(26, 22, 19, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+.modal-content {
+  background: var(--card-bg);
+  border: 1px solid var(--warm-gray);
+  border-radius: 12px;
+  padding: 24px;
+  width: 320px;
+  box-shadow: 0 12px 40px rgba(0,0,0,0.1);
+}
+
+/* ---- History record styles ---- */
+.history-time {
+  font-size: 11px;
+  color: var(--muted);
+  white-space: nowrap;
+  flex-shrink: 0;
+  margin-left: auto;
+  padding-left: 8px;
+}
+
+.history-sort-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-family: 'DM Sans', sans-serif;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--muted);
+  background: transparent;
+  border: 1px solid var(--warm-gray);
+  border-radius: 6px;
+  padding: 4px 10px;
+  cursor: pointer;
+  transition: all 0.2s;
+  margin-left: 8px;
+  white-space: nowrap;
+}
+
+.history-sort-btn:hover {
+  border-color: var(--accent-amber);
+  color: var(--accent-amber);
+}
+
+.history-sort-btn svg {
+  width: 14px;
+  height: 14px;
+}
+
+.history-chip {
+  cursor: pointer;
+}
+
+.history-chip:hover .history-time {
+  color: var(--accent-amber);
 }

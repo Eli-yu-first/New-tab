@@ -1,91 +1,67 @@
-# Tab Out
+<div align="center">
 
-**Keep tabs on your tabs.**
+# 🚀 Tab New (Tab Out)
+A hyper-smart, minimalistic, and unified browser New Tab extension.
+**极简、智能、聚合：您的下一代浏览器起始页。**
 
-Tab Out is a Chrome extension that replaces your new tab page with a dashboard of everything you have open. Tabs are grouped by domain, with homepages (Gmail, X, LinkedIn, etc.) pulled into their own group. Close tabs with a satisfying swoosh + confetti.
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 
-No server. No account. No external API calls. Just a Chrome extension.
+[English](#-english) • [简体中文](#-简体中文)
 
----
-
-## Install with a coding agent
-
-Send your coding agent (Claude Code, Codex, etc.) this repo and say **"install this"**:
-
-```
-https://github.com/zarazhangrui/tab-out
-```
-
-The agent will walk you through it. Takes about 1 minute.
+</div>
 
 ---
 
-## Features
-
-- **See all your tabs at a glance** on a clean grid, grouped by domain
-- **Homepages group** pulls Gmail inbox, X home, YouTube, LinkedIn, GitHub homepages into one card
-- **Close tabs with style** with swoosh sound + confetti burst
-- **Duplicate detection** flags when you have the same page open twice, with one-click cleanup
-- **Click any tab to jump to it** across windows, no new tab opened
-- **Save for later** bookmark tabs to a checklist before closing them
-- **Localhost grouping** shows port numbers next to each tab so you can tell your vibe coding projects apart
-- **Expandable groups** show the first 8 tabs with a clickable "+N more"
-- **100% local** your data never leaves your machine
-- **Pure Chrome extension** no server, no Node.js, no npm, no setup beyond loading the extension
+<div align="center">
+  <img src="assets/preview.png" alt="Tab New Dashboard Preview" width="100%">
+</div>
 
 ---
 
-## Manual Setup
+## 🇺🇸 English
 
-**1. Clone the repo**
+### ✨ Features
+**Tab New** (formerly Tab Out) transforms your messy browser tabs into an organized, beautiful dashboard.
+*   **🌐 Smart Domain Grouping**: Automatically groups your open tabs by domain, decluttering your workspace instantly.
+*   **⚡️ Global Fuzzy Search**: A lightning-fast, debounced search bar that scans across your *Open Tabs*, *History*, *Saved for Later*, and *Bookmarks* simultaneously.
+*   **🕰️ Intelligent History Timeline**: Reimagined history view grouped logically by *Today*, *This Week*, *This Month*, and *Older*, with dynamic sorting.
+*   **☁️ Cloud Sync & Persistence**: Your *Bookmarks* and *Saved for Later* tabs are securely stored and synced across all your desktop devices via `chrome.storage.sync`.
+*   **💾 Local Backup & Restore**: Take control of your data. Instantly backup and restore your bookmarks and saved tabs in an offline JSON file.
 
-```bash
-git clone https://github.com/zarazhangrui/tab-out.git
-```
+### 🛠️ Installation
+Since the extension is currently in beta and not yet on the Chrome Web Store:
+1. Download or clone this repository.
+2. Open your Chrome/Edge browser and navigate to `chrome://extensions/`.
+3. Enable **Developer mode** in the top right corner.
+4. Click **Load unpacked** and select the `extension` folder from this repository.
+5. Open a New Tab and enjoy!
 
-**2. Load the Chrome extension**
-
-1. Open Chrome and go to `chrome://extensions`
-2. Enable **Developer mode** (top-right toggle)
-3. Click **Load unpacked**
-4. Navigate to the `extension/` folder inside the cloned repo and select it
-
-**3. Open a new tab**
-
-You'll see Tab Out.
-
----
-
-## How it works
-
-```
-You open a new tab
-  -> Tab Out shows your open tabs grouped by domain
-  -> Homepages (Gmail, X, etc.) get their own group at the top
-  -> Click any tab title to jump to it
-  -> Close groups you're done with (swoosh + confetti)
-  -> Save tabs for later before closing them
-```
-
-Everything runs inside the Chrome extension. No external server, no API calls, no data sent anywhere. Saved tabs are stored in `chrome.storage.local`.
+*(Note: Safari is also supported using the `xcrun safari-web-extension-converter` tool on macOS.)*
 
 ---
 
-## Tech stack
+## 🇨🇳 简体中文
 
-| What | How |
-|------|-----|
-| Extension | Chrome Manifest V3 |
-| Storage | chrome.storage.local |
-| Sound | Web Audio API (synthesized, no files) |
-| Animations | CSS transitions + JS confetti particles |
+### ✨ 核心特性
+**Tab New** 旨在将您凌乱的浏览器标签页转化为一个井然有序、极具现代美感的个人控制台。
+*   **🌐 智能域名聚合**：自动识别并将您打开的无数标签页按照「域名」进行优雅折叠与分组，告别拥挤的标签栏。
+*   **⚡️ 全局防抖检索**：毫秒级响应的全局搜索框。支持中英文混合模糊匹配，不仅能搜已打开的网页，更能同步穿透搜索您的「历史记录」、「稍后阅读」和「专属书签」。
+*   **🕰️ 智能时间轴历史**：抛弃反人类的传统历史列表。我们将您的浏览记录优雅地按「今天、本周、本月、更早」进行自然语义分组，并支持按时间随时倒序/正序查看。
+*   **☁️ 多端云漫游**：基于谷歌原生账号体系的 `chrome.storage.sync`。您的「专属书签」与「稍后阅读」状态将在您的所有设备之间无缝漫游，实时同步。
+*   **💾 本地数据掌控**：完全的去中心化体验。一键将您的专属数据打包为 JSON 文件备份到本地硬盘，支持随时跨设备、跨账号智能导入与去重恢复。
+
+### 🛠️ 安装指南
+由于扩展目前处于内测阶段，暂未上架扩展商店，您可以通过开发者模式一键安装：
+1. 下载或 Clone 本仓库代码到您的电脑。
+2. 打开 Chrome 或 Edge 浏览器，在地址栏输入并进入 `chrome://extensions/`。
+3. 开启页面右上角的 **开发者模式 (Developer mode)**。
+4. 点击左上角的 **加载已解压的扩展程序 (Load unpacked)**，并选择本项目中的 `extension` 文件夹。
+5. 打开一个新的标签页，开启您的全新体验！
+
+*(提示：如果您是 Mac 用户，本扩展同样支持 Safari 浏览器。您可以使用 Xcode 提供的 `xcrun safari-web-extension-converter` 命令一键转换并安装。)*
 
 ---
 
-## License
-
-MIT
-
----
-
-Built by [Zara](https://x.com/zarazhangrui)
+<div align="center">
+  <sub>Built with ❤️ by <a href="https://x.com/zarazhangrui">Eli</a></sub>
+</div>

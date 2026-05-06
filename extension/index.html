@@ -14,19 +14,27 @@
 <body>
 <div class="container">
 
-
-
   <!-- ================================================================
-       HEADER — greeting on the left
+       TOP SEARCH BAR — search with Google, Microsoft, or Baidu
        ================================================================ -->
-  <header>
-    <div class="header-left">
-      <!-- "Good afternoon" — written by getGreeting() in app.js -->
-      <h1 id="greeting"></h1>
-      <!-- "Friday, April 4, 2026" — written by getDateDisplay() in app.js -->
-      <div class="date" id="dateDisplay"></div>
+  <div class="top-search-bar" id="topSearchBar" style="position: relative;">
+    <div class="search-container">
+      <select id="searchEngine" class="search-engine-select">
+        <option value="google">Google</option>
+        <option value="bing">Microsoft Bing</option>
+        <option value="baidu">Baidu</option>
+      </select>
+      <input type="text" id="searchInput" class="search-input" placeholder="Search the web..." />
+      <button class="search-btn" id="searchBtn">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+        </svg>
+      </button>
     </div>
-  </header>
+    <div class="section-search" style="position: absolute; right: 0; top: 50%; transform: translateY(-50%);">
+      <input type="text" id="tabSearchInput" class="tab-search-input" placeholder="Search tabs..." />
+    </div>
+  </div>
 
   <!-- ================================================================
        TAB OUT DUPES BANNER — appears when you have extra Tab Out tabs open
@@ -47,51 +55,70 @@
   </div>
 
   <!-- ================================================================
-       MAIN CONTENT AREA — two-column layout
-       Left: open tabs (domain/mission cards)
-       Right: saved for later checklist
-       The right column only renders when it has items (JS controls this)
+       MAIN CONTENT AREA — three-column layout
+       Column 1: Open tabs
+       Column 2: Frequently used tabs
+       Column 3: Bookmarks
        ================================================================ -->
+
+
   <div class="dashboard-columns" id="dashboardColumns">
 
-    <!-- LEFT COLUMN: Open tabs -->
-    <div class="active-section" id="openTabsSection" style="display:none">
+    <!-- COLUMN 1: Open tabs -->
+    <div class="tab-column" id="openTabsSection" style="display:none">
       <div class="section-header">
-        <h2 id="openTabsSectionTitle">Right now</h2>
+        <h2 id="openTabsSectionTitle">Open tabs</h2>
         <div class="section-line"></div>
         <div class="section-count" id="openTabsSectionCount"></div>
       </div>
       <div class="missions" id="openTabsMissions"></div>
     </div>
 
-    <!-- RIGHT COLUMN: Saved for Later checklist -->
-    <div class="deferred-column" id="deferredColumn" style="display:none">
+    <!-- COLUMN 2: History -->
+    <div class="tab-column" id="frequentTabsSection" style="display:none">
+      <div class="section-header">
+        <h2>历史记录</h2>
+        <div class="section-line"></div>
+        <div class="section-count" id="frequentTabsCount"></div>
+        <button class="history-sort-btn" id="historySortBtn" title="切换排序">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M3 4.5h14.25M3 9h9.75M3 13.5h5.25m5.25 0L17.25 9m0 0L21 13.5m-3.75-4.5V21" />
+          </svg>
+          <span id="historySortLabel">最新</span>
+        </button>
+      </div>
+      <div class="missions" id="frequentTabsMissions"></div>
+    </div>
+
+    <!-- COLUMN 3: Saved for later -->
+    <div class="tab-column" id="savedTabsSection" style="display:none">
       <div class="section-header">
         <h2>Saved for later</h2>
         <div class="section-line"></div>
-        <div class="section-count" id="deferredCount"></div>
-      </div>
-
-      <!-- Active checklist items — injected by renderDeferredList() in app.js -->
-      <div class="deferred-list" id="deferredList"></div>
-
-      <!-- Empty state — shown when no active deferred tabs -->
-      <div class="deferred-empty" id="deferredEmpty" style="display:none">
-        Nothing saved. Living in the moment.
-      </div>
-
-      <!-- Archive section — collapsed by default -->
-      <div class="deferred-archive" id="deferredArchive" style="display:none">
-        <button class="archive-toggle" id="archiveToggle">
-          <svg class="archive-chevron" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" /></svg>
-          Archive
-          <span class="archive-count" id="archiveCount"></span>
+        <div class="section-count" id="savedTabsCount"></div>
+        <button class="history-sort-btn" id="savedTabsSortBtn" title="切换排序">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M3 4.5h14.25M3 9h9.75M3 13.5h5.25m5.25 0L17.25 9m0 0L21 13.5m-3.75-4.5V21" />
+          </svg>
+          <span id="savedTabsSortLabel">最新</span>
         </button>
-        <div class="archive-body" id="archiveBody" style="display:none">
-          <input type="text" class="archive-search" id="archiveSearch" placeholder="Search archived tabs...">
-          <div class="archive-list" id="archiveList"></div>
-        </div>
       </div>
+      <div class="missions" id="savedTabsMissions"></div>
+    </div>
+
+    <!-- COLUMN 4: Bookmarks -->
+    <div class="tab-column" id="bookmarksSection" style="display:none">
+      <div class="section-header">
+        <h2>Bookmarks</h2>
+        <div class="section-line"></div>
+        <div class="section-count" id="bookmarksCount"></div>
+        <button class="add-bookmark-btn" id="addNewBookmarkBtn" title="Add new bookmark">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />
+          </svg>
+        </button>
+      </div>
+      <div class="missions" id="bookmarksMissions"></div>
     </div>
 
   </div><!-- end .dashboard-columns -->
@@ -100,14 +127,19 @@
        FOOTER — global stats + refresh control
        ================================================================ -->
   <footer>
-    <div class="footer-stats">
+    <div class="footer-stats" style="display: flex; align-items: center; gap: 16px;">
       <div class="stat">
         <div class="stat-num" id="statTabs">—</div>
         <div class="stat-label">Open tabs</div>
       </div>
+      <div class="data-actions" style="display: flex; gap: 12px; align-items: center; border-left: 1px solid var(--surface-hover); padding-left: 16px;">
+        <button id="exportDataBtn" style="background:none; border:none; color:var(--muted); font-size:11px; cursor:pointer; text-decoration:underline; text-underline-offset:2px; padding:0; font-family:inherit;">Backup Data</button>
+        <button id="importDataBtn" style="background:none; border:none; color:var(--muted); font-size:11px; cursor:pointer; text-decoration:underline; text-underline-offset:2px; padding:0; font-family:inherit;">Restore</button>
+        <input type="file" id="importDataInput" accept=".json" style="display:none;" />
+      </div>
     </div>
     <div class="last-refresh">
-      <span style="color: var(--muted); font-size: 11px;"><a href="https://github.com/zarazhangrui/tab-out" target="_top" style="color: var(--muted); text-decoration: underline; text-underline-offset: 2px;">Tab Out</a> by <a href="https://x.com/zarazhangrui" target="_top" style="color: var(--muted); text-decoration: underline; text-underline-offset: 2px;">Zara</a></span>
+      <span style="color: var(--muted); font-size: 11px;"><a href="https://github.com/zarazhangrui/tab-out" target="_top" style="color: var(--muted); text-decoration: underline; text-underline-offset: 2px;">Tab New</a> by <a href="https://x.com/zarazhangrui" target="_top" style="color: var(--muted); text-decoration: underline; text-underline-offset: 2px;">Eli</a></span>
     </div>
   </footer>
 
@@ -123,6 +155,25 @@
     <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
   </svg>
   <span id="toastText"></span>
+</div>
+
+<!-- Custom Bookmark Modal -->
+<div id="bookmarkModal" class="modal-overlay" style="display:none;">
+  <div class="modal-content">
+    <h3 style="margin-bottom: 16px; font-family: 'Newsreader', serif; font-weight: 400; font-style: italic; font-size: 20px; color: var(--ink);">Add new bookmark</h3>
+    <div style="margin-bottom: 12px;">
+      <label style="display: block; font-size: 12px; color: var(--muted); margin-bottom: 4px;">URL</label>
+      <input type="text" id="bookmarkModalUrl" class="search-input" style="width: 100%; box-sizing: border-box;" placeholder="https://example.com" />
+    </div>
+    <div style="margin-bottom: 20px;">
+      <label style="display: block; font-size: 12px; color: var(--muted); margin-bottom: 4px;">Title</label>
+      <input type="text" id="bookmarkModalTitle" class="search-input" style="width: 100%; box-sizing: border-box;" placeholder="My Bookmark" />
+    </div>
+    <div style="display: flex; justify-content: flex-end; gap: 8px;">
+      <button id="bookmarkModalCancel" class="action-btn">Cancel</button>
+      <button id="bookmarkModalSave" class="action-btn primary">Save</button>
+    </div>
+  </div>
 </div>
 
 <!-- Personal config (gitignored) — defines LOCAL_LANDING_PAGE_PATTERNS etc. -->

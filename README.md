@@ -102,5 +102,5 @@ Since Safari uses a different extension packaging model, you need to compile it 
 ---
 
 <div align="center">
-  <sub>Built with ❤️ by <a href="https://x.com/zarazhangrui">Eli</a></sub>
+  <sub>Built with ❤️ by <a href="https://x.com/yueli0681790578?s=21">Eli</a></sub>
 </div>

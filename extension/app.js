@@ -971,6 +971,11 @@ function renderHistoryCard(groupLabel, items, groupKey) {
       ${faviconUrl ? `<img class="chip-favicon" src="${faviconUrl}" alt="" onerror="this.style.display='none'">` : ''}
       <span class="chip-text">${label}</span>
       <span class="history-time">${timeStr}</span>
+      <div class="chip-actions">
+        <button class="chip-action chip-delete" data-action="delete-history-item" data-tab-url="${safeUrl}" title="Delete history">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+        </button>
+      </div>
     </div>`;
   }
 
@@ -1404,6 +1409,22 @@ document.addEventListener('click', async (e) => {
     return;
   }
 
+  if (action === 'delete-history-item') {
+    e.stopPropagation();
+    const url = actionEl.dataset.tabUrl;
+    if (!url) return;
+
+    try {
+      await chrome.history.deleteUrl({ url });
+      showToast('Deleted from history');
+      await renderDashboard();
+    } catch (err) {
+      console.error('[tab-out] Failed to delete history:', err);
+      showToast('Failed to delete history');
+    }
+    return;
+  }
+
   if (action === 'close-domain-tabs') {
     const domainId = actionEl.dataset.domainId;
     const group    = domainGroups.find(g => {
@@ -1825,6 +1846,9 @@ document.addEventListener('DOMContentLoaded', () => {
   document.addEventListener('click', (e) => {
     const el = e.target.closest('[data-action="open-history-url"]');
     if (el) {
+      if (e.target.closest('[data-action="delete-history-item"]')) {
+        return;
+      }
       const url = el.dataset.tabUrl;
       if (url) chrome.tabs.create({ url });
     }

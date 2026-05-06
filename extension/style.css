@@ -1424,6 +1424,14 @@ footer { animation: fadeUp 0.5s ease 0.65s both; }
   cursor: pointer;
 }
 
+.history-chip .chip-actions {
+  display: none;
+}
+
+.history-chip:hover .chip-actions {
+  display: flex;
+}
+
 .history-chip:hover .history-time {
-  color: var(--accent-amber);
+  display: none;
 }

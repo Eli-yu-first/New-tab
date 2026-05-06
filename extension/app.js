@@ -930,7 +930,7 @@ function renderSimpleCard(title, items, sectionType) {
 }
 
 /**
- * renderHistoryCard — 渲染单个时间分组的历史记录卡片
+ * renderHistoryCard — 渲染单个时间分组的History卡片
  * 每条记录展示 favicon、标题、访问时间
  */
 function renderHistoryCard(groupLabel, items, groupKey) {
@@ -1002,7 +1002,7 @@ function renderHistoryCard(groupLabel, items, groupKey) {
 }
 
 /**
- * renderHistoryGroups — 渲染全部时间分组的历史记录
+ * renderHistoryGroups — 渲染全部时间分组的History
  */
 function renderHistoryGroups(groups) {
   let html = '';
@@ -1194,7 +1194,7 @@ async function renderStaticDashboard() {
   if (frequentTabsSection) {
     frequentTabsSection.style.display = 'block';
     if (historyItems.length > 0) {
-      // 按当前排序方向对历史记录排序
+      // 按当前排序方向对History排序
       const sortedItems = [...historyItems].sort((a, b) => {
         return historySortOrder === 'time-asc'
           ? (a.lastVisitTime || 0) - (b.lastVisitTime || 0)
@@ -1802,7 +1802,7 @@ document.addEventListener('DOMContentLoaded', () => {
   setupSearchHandlers();
   setupBookmarkButtons();
 
-  // 历史记录排序按钮
+  // History排序按钮
   const historySortBtn = document.getElementById('historySortBtn');
   if (historySortBtn) {
     historySortBtn.addEventListener('click', async () => {
@@ -1824,7 +1824,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // 历史记录条目点击 → 打开新标签
+  // History条目点击 → 打开新标签
   document.addEventListener('click', (e) => {
     const el = e.target.closest('[data-action="open-history-url"]');
     if (el) {

@@ -597,14 +597,14 @@ header {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  background: rgba(154, 145, 138, 0.08);
-  border: 1px solid rgba(154, 145, 138, 0.15);
+  background: transparent;
+  border: none;
   color: var(--muted);
   cursor: pointer;
   padding: 6px;
   border-radius: 6px;
-  opacity: 1;
-  transition: all 0.2s;
+  opacity: 0.55;
+  transition: all 0.2s ease;
   flex-shrink: 0;
 }
 
@@ -614,33 +614,27 @@ header {
 }
 
 .chip-action:hover {
-  transform: translateY(-1px);
+  opacity: 1;
 }
 
 .chip-save {
-  color: var(--accent-sage);
-  background: rgba(90, 122, 98, 0.08);
-  border-color: rgba(90, 122, 98, 0.2);
+  color: var(--muted);
+  background: transparent;
 }
 
 .chip-save:hover {
-  color: white;
-  background: var(--accent-sage);
-  border-color: var(--accent-sage);
-  box-shadow: 0 2px 8px rgba(90, 122, 98, 0.3);
+  color: var(--accent-sage);
+  background: rgba(90, 122, 98, 0.1);
 }
 
 .chip-close {
-  color: var(--status-abandoned);
-  background: rgba(179, 90, 90, 0.08);
-  border-color: rgba(179, 90, 90, 0.2);
+  color: var(--muted);
+  background: transparent;
 }
 
 .chip-close:hover {
-  color: white;
-  background: var(--status-abandoned);
-  border-color: var(--status-abandoned);
-  box-shadow: 0 2px 8px rgba(179, 90, 90, 0.3);
+  color: var(--status-abandoned);
+  background: rgba(179, 90, 90, 0.1);
 }
 
 .page-chip.clickable {

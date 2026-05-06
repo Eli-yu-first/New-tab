@@ -17,6 +17,126 @@
 
 
 /* ----------------------------------------------------------------
+   NATIVE MESSAGING — 跨浏览器同步
+
+   通过 Native Messaging Host 读写本地共享 JSON 文件
+   (~/.newtab_sync/data.json)，使同一台电脑上不同浏览器
+   中的 New Tab 扩展共享 Bookmarks 和 Saved for later 数据。
+
+   若 Native Messaging Host 未安装，则自动降级为仅使用
+   chrome.storage.sync（原有行为，不影响正常使用）。
+   ---------------------------------------------------------------- */
+
+const NATIVE_HOST_NAME = 'com.newtab.sync';
+let nativeHostAvailable = null; // null=未检测, true/false=已检测
+
+/**
+ * 向 Native Messaging Host 发送一条消息并返回响应。
+ * 若 Host 不可用则返回 null 并标记为不可用。
+ */
+async function nativeSend(message) {
+  if (nativeHostAvailable === false) return null;
+  return new Promise((resolve) => {
+    try {
+      chrome.runtime.sendNativeMessage(NATIVE_HOST_NAME, message, (response) => {
+        if (chrome.runtime.lastError) {
+          nativeHostAvailable = false;
+          resolve(null);
+        } else {
+          nativeHostAvailable = true;
+          resolve(response);
+        }
+      });
+    } catch {
+      nativeHostAvailable = false;
+      resolve(null);
+    }
+  });
+}
+
+/**
+ * 从共享文件读取全部数据。
+ */
+async function nativeRead() {
+  const resp = await nativeSend({ action: 'read' });
+  if (resp && resp.success) return resp.data;
+  return null;
+}
+
+/**
+ * 将全部数据写入共享文件。
+ */
+async function nativeWrite(data) {
+  await nativeSend({ action: 'write', data });
+}
+
+/**
+ * 合并两个 bookmarks 数组（以 URL 为唯一标识去重）。
+ */
+function mergeBookmarks(a, b) {
+  const map = new Map();
+  for (const item of a) map.set(item.url, item);
+  for (const item of b) {
+    if (!map.has(item.url)) map.set(item.url, item);
+  }
+  return Array.from(map.values());
+}
+
+/**
+ * 合并两个 deferred 数组（以 id 为唯一标识去重）。
+ */
+function mergeDeferred(a, b) {
+  const map = new Map();
+  for (const item of a) map.set(item.id, item);
+  for (const item of b) {
+    if (!map.has(item.id)) map.set(item.id, item);
+  }
+  return Array.from(map.values());
+}
+
+/**
+ * 启动时执行一次：从共享文件读取数据，与本地 chrome.storage 合并，
+ * 并将合并结果写回两侧，确保数据一致。
+ */
+async function syncFromNativeHost() {
+  const shared = await nativeRead();
+  if (!shared) return; // Native Host 不可用，跳过
+
+  // 读取本地 chrome.storage 数据
+  const syncResult = await chrome.storage.sync.get(['deferred', BOOKMARKS_STORAGE_KEY]);
+  const localDeferred = syncResult.deferred || [];
+  const localBookmarks = syncResult[BOOKMARKS_STORAGE_KEY] || [];
+
+  // 合并
+  const mergedDeferred = mergeDeferred(shared.deferred || [], localDeferred);
+  const mergedBookmarks = mergeBookmarks(shared.bookmarks || [], localBookmarks);
+
+  // 写回两侧
+  await chrome.storage.sync.set({
+    deferred: mergedDeferred,
+    [BOOKMARKS_STORAGE_KEY]: mergedBookmarks,
+  });
+  await nativeWrite({ bookmarks: mergedBookmarks, deferred: mergedDeferred });
+}
+
+/**
+ * 将当前数据推送到共享文件（写操作时调用）。
+ */
+async function pushToNativeHost() {
+  if (nativeHostAvailable === false) return;
+  try {
+    const syncResult = await chrome.storage.sync.get(['deferred', BOOKMARKS_STORAGE_KEY]);
+    await nativeWrite({
+      bookmarks: syncResult[BOOKMARKS_STORAGE_KEY] || [],
+      deferred: syncResult.deferred || [],
+    });
+  } catch {
+    // 静默失败
+  }
+}
+
+
+/* ----------------------------------------------------------------
    CHROME TABS — Direct API Access
 
    Since this page IS the extension's new tab page, it has full
@@ -217,6 +337,7 @@ async function getDeferred() {
 // 统一的写入逻辑（保存至云端同步存储区）
 async function setDeferred(deferred) {
   await chrome.storage.sync.set({ deferred });
+  await pushToNativeHost();
 }
 
 async function saveTabForLater(tab) {
@@ -1577,7 +1698,10 @@ async function getCustomBookmarks() {
 async function saveCustomBookmarks(bookmarks) {
   return new Promise((resolve) => {
     // 保存至同步存储区，所有登录了同一谷歌账号的设备会自动同步
-    chrome.storage.sync.set({ [BOOKMARKS_STORAGE_KEY]: bookmarks }, resolve);
+    chrome.storage.sync.set({ [BOOKMARKS_STORAGE_KEY]: bookmarks }, async () => {
+      await pushToNativeHost();
+      resolve();
+    });
   });
 }
 
@@ -1836,7 +1960,8 @@ function filterTabs(query) {
    INITIALIZATION
    ---------------------------------------------------------------- */
 
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
+  await syncFromNativeHost();
   renderDashboard();
   setupSearchHandlers();
   setupBookmarkButtons();

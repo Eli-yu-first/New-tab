@@ -31,6 +31,51 @@ const NATIVE_HOST_NAME = 'com.newtab.sync';
 let nativeHostAvailable = null; // null=未检测, true/false=已检测
 let nativePort = null;
 
+// 缓存接收到的全端数据（含历史和打开标签页）
+let sharedNativeData = { bookmarks: [], deferred: [], openTabs: {}, history: [] };
+
+/**
+ * 智能自动检测当前浏览器品牌
+ */
+function getBrowserName() {
+  const ua = navigator.userAgent;
+  if (ua.includes('Doubao')) return 'Doubao';
+  if (ua.includes('Edg')) return 'Edge';
+  if (ua.includes('Brave')) return 'Brave';
+  return 'Chrome';
+}
+
+/**
+ * URL 规范化归一（去除协议、www、尾部斜杠、参数、Hash），用于高精度相似网址判定
+ */
+function getNormalizedUrl(urlString) {
+  if (!urlString) return '';
+  try {
+    if (urlString.startsWith('chrome://') || urlString.startsWith('chrome-extension://')) {
+      return urlString;
+    }
+    const url = new URL(urlString);
+    let host = url.hostname.toLowerCase();
+    if (host.startsWith('www.')) host = host.slice(4);
+    let path = url.pathname.toLowerCase();
+    if (path.endsWith('/')) path = path.slice(0, -1);
+    return host + path;
+  } catch {
+    let clean = urlString.toLowerCase();
+    clean = clean.replace(/^(https?:\/\/)?(www\.)?/, '');
+    clean = clean.replace(/\/$/, '');
+    clean = clean.split('?')[0].split('#')[0];
+    return clean;
+  }
+}
+
+/**
+ * 判定两个网址是否“相似”
+ */
+function isSimilarUrl(urlA, urlB) {
+  return getNormalizedUrl(urlA) === getNormalizedUrl(urlB);
+}
+
 /**
  * 合并两个 bookmarks 数组（以 URL 为唯一标识去重）。
  */
@@ -64,9 +109,12 @@ function setupNativePort() {
     nativePort = chrome.runtime.connectNative(NATIVE_HOST_NAME);
     
     nativePort.onMessage.addListener(async (msg) => {
+      // 处理全端数据改变
       if (msg && msg.event === 'changed') {
         const shared = msg.data;
         if (!shared) return;
+
+        sharedNativeData = shared; // 缓存最新全端数据给全局
 
         // 获取本地存储数据
         const syncResult = await chrome.storage.sync.get(['deferred', BOOKMARKS_STORAGE_KEY]);
@@ -99,8 +147,23 @@ function setupNativePort() {
           });
         }
 
-        // 重新渲染控制台
+        // 刷新本地标签页、获取并重绘整个 Dashboard 视图
+        await fetchOpenTabs();
         await renderDashboard();
+      }
+
+      // 处理跨浏览器远程关闭标签页指令
+      if (msg && msg.event === 'closeTabRequest') {
+        const myBrowser = getBrowserName();
+        if (msg.browser === myBrowser && msg.url) {
+          const allTabs = await chrome.tabs.query({});
+          const matches = allTabs.filter(t => isSimilarUrl(t.url, msg.url));
+          for (const t of matches) {
+            await chrome.tabs.remove(t.id);
+          }
+          await fetchOpenTabs();
+          await renderDashboard();
+        }
       }
     });
 
@@ -150,8 +213,8 @@ let openTabs = [];
 /**
  * fetchOpenTabs()
  *
- * Reads all currently open browser tabs directly from Chrome.
- * Sets the extensionId flag so we can identify New Tab's own pages.
+ * 读取当前浏览器中真正打开的标签页，将其上报给共享宿主；
+ * 同时拉取共享内存中其它浏览器开着的标签页，利用“相似网址”判定进行多端归集和合并。
  */
 async function fetchOpenTabs() {
   try {
@@ -159,15 +222,72 @@ async function fetchOpenTabs() {
     const newtabUrl = `chrome-extension://${extensionId}/index.html`;
 
     const tabs = await chrome.tabs.query({});
-    openTabs = tabs.map(t => ({
+    const filteredLocal = tabs.filter(t => t.url && t.url !== newtabUrl && t.url !== 'chrome://newtab/');
+    
+    const formattedLocal = filteredLocal.map(t => ({
+      id:       t.id,
+      url:      t.url,
+      title:    t.title || t.url,
+      favIconUrl: t.favIconUrl || '',
+      windowId: t.windowId,
+      active:   t.active
+    }));
+
+    // 将本浏览器的打开标签推送到共享媒介
+    if (nativePort) {
+      nativePort.postMessage({
+        action: 'writeOpenTabs',
+        browser: getBrowserName(),
+        tabs: formattedLocal
+      });
+    }
+
+    // 跨端整合合并
+    let combinedTabs = [...formattedLocal];
+    const myBrowser = getBrowserName();
+
+    if (sharedNativeData && sharedNativeData.openTabs) {
+      for (const [browser, remoteTabs] of Object.entries(sharedNativeData.openTabs)) {
+        if (browser === myBrowser) continue; // 剔除自己
+        if (!Array.isArray(remoteTabs)) continue;
+
+        for (const remoteTab of remoteTabs) {
+          const similarMatch = combinedTabs.find(t => isSimilarUrl(t.url, remoteTab.url));
+          if (similarMatch) {
+            // 如果两个端打开了相似/相同的网址，合并它们，并标记多端存在
+            if (!similarMatch.remoteBrowsers) similarMatch.remoteBrowsers = [];
+            if (!similarMatch.remoteBrowsers.includes(browser)) {
+              similarMatch.remoteBrowsers.push(browser);
+            }
+          } else {
+            // 在本端没开、但在其它端开着的标签，作为跨端标签显示
+            combinedTabs.push({
+              id: `remote-${browser}-${Date.now()}-${Math.random()}`,
+              url: remoteTab.url,
+              title: remoteTab.title,
+              favIconUrl: remoteTab.favIconUrl,
+              remoteBrowser: browser,
+              windowId: -1,
+              active: false
+            });
+          }
+        }
+      }
+    }
+
+    openTabs = combinedTabs.map(t => ({
       id:       t.id,
       url:      t.url,
       title:    t.title,
       windowId: t.windowId,
       active:   t.active,
-      isTabOut: t.url === newtabUrl || t.url === 'chrome://newtab/',
+      favIconUrl: t.favIconUrl,
+      remoteBrowser: t.remoteBrowser,
+      remoteBrowsers: t.remoteBrowsers,
+      isTabOut: false
     }));
-  } catch {
+  } catch (err) {
+    console.error('fetchOpenTabs error:', err);
     openTabs = [];
   }
 }
@@ -396,15 +516,15 @@ async function getHistoryItems() {
     const items = await chrome.history.search({
       text: '',
       startTime: startTime,
-      maxResults: 500,
+      maxResults: 150, // 只取最新的 150 条
     });
 
+    const uniqueLocal = [];
     const seen = new Set();
-    const unique = [];
     for (const item of items) {
       if (!item.url || seen.has(item.url)) continue;
       seen.add(item.url);
-      unique.push({
+      uniqueLocal.push({
         url: item.url,
         title: item.title || item.url,
         lastVisitTime: item.lastVisitTime || 0,
@@ -412,8 +532,38 @@ async function getHistoryItems() {
       });
     }
 
-    return unique;
-  } catch {
+    // 将本地的最新历史推送到共享主机以完成全端汇总
+    if (nativePort && uniqueLocal.length > 0) {
+      nativePort.postMessage({
+        action: 'writeHistory',
+        history: uniqueLocal
+      });
+    }
+
+    // 整合其它端发来的历史记录并做“网址相似”合并去重
+    let combinedHistory = [...uniqueLocal];
+    if (sharedNativeData && Array.isArray(sharedNativeData.history)) {
+      for (const hist of sharedNativeData.history) {
+        const match = combinedHistory.find(h => isSimilarUrl(h.url, hist.url));
+        if (match) {
+          // 若属于相似 URL，做整合：取最新的访问时间，标题取长，计数加一
+          match.lastVisitTime = Math.max(match.lastVisitTime || 0, hist.lastVisitTime || 0);
+          match.visitCount = Math.max(match.visitCount || 0, hist.visitCount || 0) + 1;
+          if (hist.title && hist.title.length > match.title.length) {
+            match.title = hist.title;
+          }
+        } else {
+          combinedHistory.push(hist);
+        }
+      }
+    }
+
+    // 重新按最后访问时间降序排列
+    combinedHistory.sort((a, b) => b.lastVisitTime - a.lastVisitTime);
+
+    return combinedHistory;
+  } catch (err) {
+    console.error('getHistoryItems error:', err);
     return [];
   }
 }
@@ -866,9 +1016,17 @@ function buildOverflowChips(hiddenTabs, urlCounts = {}) {
     let domain = '';
     try { domain = new URL(tab.url).hostname; } catch {}
     const faviconUrl = domain ? `https://www.google.com/s2/favicons?domain=${domain}&sz=16` : '';
+    let remoteBadge = '';
+    if (tab.remoteBrowser) {
+      remoteBadge = ` <span class="remote-badge remote-${tab.remoteBrowser.toLowerCase()}" style="font-size:9px; background:rgba(154,145,138,0.15); color:var(--muted); padding:1px 4px; border-radius:3px; margin-left:4px;">${tab.remoteBrowser}</span>`;
+    }
+    if (tab.remoteBrowsers && tab.remoteBrowsers.length > 0) {
+      remoteBadge = ` <span class="remote-badge remote-multi" style="font-size:9px; background:rgba(90,122,98,0.15); color:var(--accent-sage); padding:1px 4px; border-radius:3px; margin-left:4px;">多端</span>`;
+    }
+
     return `<div class="page-chip clickable${chipClass}" data-action="focus-tab" data-tab-url="${safeUrl}" title="${safeTitle}">
       ${faviconUrl ? `<img class="chip-favicon" src="${faviconUrl}" alt="" onerror="this.style.display='none'">` : ''}
-      <span class="chip-text">${label}</span>${dupeTag}
+      <span class="chip-text">${label}</span>${dupeTag}${remoteBadge}
       <div class="chip-actions">
         <button class="chip-action chip-save" data-action="defer-single-tab" data-tab-url="${safeUrl}" data-tab-title="${safeTitle}" title="Save for later">
           <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M17.593 3.322c1.1.128 1.907 1.077 1.907 2.185V21L12 17.25 4.5 21V5.507c0-1.108.806-2.057 1.907-2.185a48.507 48.507 0 0 1 11.186 0Z" /></svg>
@@ -943,9 +1101,17 @@ function renderDomainCard(group) {
     let domain = '';
     try { domain = new URL(tab.url).hostname; } catch {}
     const faviconUrl = domain ? `https://www.google.com/s2/favicons?domain=${domain}&sz=16` : '';
+    let remoteBadge = '';
+    if (tab.remoteBrowser) {
+      remoteBadge = ` <span class="remote-badge remote-${tab.remoteBrowser.toLowerCase()}" style="font-size:9px; background:rgba(154,145,138,0.15); color:var(--muted); padding:1px 4px; border-radius:3px; margin-left:4px;">${tab.remoteBrowser}</span>`;
+    }
+    if (tab.remoteBrowsers && tab.remoteBrowsers.length > 0) {
+      remoteBadge = ` <span class="remote-badge remote-multi" style="font-size:9px; background:rgba(90,122,98,0.15); color:var(--accent-sage); padding:1px 4px; border-radius:3px; margin-left:4px;">多端</span>`;
+    }
+
     return `<div class="page-chip clickable${chipClass}" data-action="focus-tab" data-tab-url="${safeUrl}" title="${safeTitle}">
       ${faviconUrl ? `<img class="chip-favicon" src="${faviconUrl}" alt="" onerror="this.style.display='none'">` : ''}
-      <span class="chip-text">${label}</span>${dupeTag}
+      <span class="chip-text">${label}</span>${dupeTag}${remoteBadge}
       <div class="chip-actions">
         <button class="chip-action chip-save" data-action="defer-single-tab" data-tab-url="${safeUrl}" data-tab-title="${safeTitle}" title="Save for later">
           <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M17.593 3.322c1.1.128 1.907 1.077 1.907 2.185V21L12 17.25 4.5 21V5.507c0-1.108.806-2.057 1.907-2.185a48.507 48.507 0 0 1 11.186 0Z" /></svg>
@@ -1467,8 +1633,31 @@ document.addEventListener('click', async (e) => {
     const tabUrl = actionEl.dataset.tabUrl;
     if (!tabUrl) return;
 
+    // 支持跨浏览器多端远程关闭
+    if (nativePort) {
+      const matchedOpenTab = openTabs.find(t => t.url === tabUrl);
+      if (matchedOpenTab) {
+        if (matchedOpenTab.remoteBrowser) {
+          nativePort.postMessage({
+            action: 'requestCloseTab',
+            browser: matchedOpenTab.remoteBrowser,
+            url: tabUrl
+          });
+        }
+        if (matchedOpenTab.remoteBrowsers && matchedOpenTab.remoteBrowsers.length > 0) {
+          for (const rb of matchedOpenTab.remoteBrowsers) {
+            nativePort.postMessage({
+              action: 'requestCloseTab',
+              browser: rb,
+              url: tabUrl
+            });
+          }
+        }
+      }
+    }
+
     const allTabs = await chrome.tabs.query({});
-    const match   = allTabs.find(t => t.url === tabUrl);
+    const match   = allTabs.find(t => t.url === tabUrl || isSimilarUrl(t.url, tabUrl));
     if (match) await chrome.tabs.remove(match.id);
     await fetchOpenTabs();
 

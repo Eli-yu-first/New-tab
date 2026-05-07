@@ -2166,6 +2166,86 @@ function performSearch(query) {
   chrome.tabs.create({ url });
 }
 
+/**
+ * 同步自定义搜索引擎下拉框的界面状态
+ */
+function syncCustomSearchDropdown() {
+  const originalSelect = document.getElementById('searchEngine');
+  const currentLogo = document.getElementById('currentEngineLogo');
+  const currentText = document.getElementById('currentEngineText');
+  const items = document.querySelectorAll('.dropdown-item');
+  
+  if (!originalSelect || !currentLogo || !currentText) return;
+  
+  const val = originalSelect.value || 'google';
+  currentText.textContent = val === 'google' ? 'Google' : val === 'bing' ? 'Microsoft Bing' : 'Baidu';
+  currentLogo.src = `https://www.google.com/s2/favicons?domain=${val === 'google' ? 'google.com' : val === 'bing' ? 'bing.com' : 'baidu.com'}&sz=32`;
+  
+  items.forEach(item => {
+    if (item.dataset.value === val) {
+      item.classList.add('active');
+    } else {
+      item.classList.remove('active');
+    }
+  });
+}
+
+/**
+ * 初始化高保真苹果风搜索引擎自定义选择框
+ */
+function setupCustomDropdown() {
+  const dropdown = document.getElementById('customSearchDropdown');
+  const trigger = document.getElementById('dropdownTrigger');
+  const menu = document.getElementById('dropdownMenu');
+  const items = document.querySelectorAll('.dropdown-item');
+  const originalSelect = document.getElementById('searchEngine');
+  
+  if (!dropdown || !trigger || !menu || !originalSelect) return;
+  
+  // 从本地持久化存储加载上一次的选择
+  chrome.storage.local.get('selectedSearchEngine', (res) => {
+    if (res.selectedSearchEngine) {
+      originalSelect.value = res.selectedSearchEngine;
+    }
+    syncCustomSearchDropdown();
+  });
+  
+  // 点击触发器展开或折叠
+  trigger.addEventListener('click', (e) => {
+    e.stopPropagation();
+    const isOpen = dropdown.classList.contains('open');
+    if (isOpen) {
+      dropdown.classList.remove('open');
+      menu.style.display = 'none';
+    } else {
+      dropdown.classList.add('open');
+      menu.style.display = 'block';
+    }
+  });
+  
+  // 选择选项
+  items.forEach(item => {
+    item.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const val = item.dataset.value;
+      
+      // 更新原生选择，触发 change 并持久化
+      originalSelect.value = val;
+      chrome.storage.local.set({ selectedSearchEngine: val });
+      syncCustomSearchDropdown();
+      
+      dropdown.classList.remove('open');
+      menu.style.display = 'none';
+    });
+  });
+  
+  // 点击页面其它任何地方隐藏下拉菜单
+  document.addEventListener('click', () => {
+    dropdown.classList.remove('open');
+    menu.style.display = 'none';
+  });
+}
+
 function setupSearchHandlers() {
   const searchInput = document.getElementById('searchInput');
   const searchBtn = document.getElementById('searchBtn');
@@ -2261,6 +2341,7 @@ document.addEventListener('DOMContentLoaded', () => {
   setupNativePort();
   renderDashboard();
   setupSearchHandlers();
+  setupCustomDropdown();
   setupBookmarkButtons();
 
   // History排序按钮

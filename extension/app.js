@@ -2221,10 +2221,12 @@ function setupCustomDropdown() {
   
   if (!dropdown || !trigger || !menu || !originalSelect) return;
   
-  // 从本地持久化存储加载上一次的选择
+  // 从本地持久化存储加载上一次的选择，若无任何选择，强制默认配置为 'google'
   chrome.storage.local.get('selectedSearchEngine', (res) => {
-    if (res.selectedSearchEngine) {
-      originalSelect.value = res.selectedSearchEngine;
+    const selected = res.selectedSearchEngine || 'google';
+    originalSelect.value = selected;
+    if (!res.selectedSearchEngine) {
+      chrome.storage.local.set({ selectedSearchEngine: 'google' });
     }
     syncCustomSearchDropdown();
   });

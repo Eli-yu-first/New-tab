@@ -135,6 +135,37 @@ async function pushToNativeHost() {
   }
 }
 
+let nativePort = null;
+
+/**
+ * 建立与 Native Messaging Host 的常驻长连接，实时监听本地共享文件的变化。
+ * 一旦检测到文件变化，自动无刷新重新合并并重绘整个 Dashboard 视图。
+ */
+function setupNativePort() {
+  if (nativeHostAvailable === false) return;
+  try {
+    nativePort = chrome.runtime.connectNative(NATIVE_HOST_NAME);
+    
+    nativePort.onMessage.addListener(async (msg) => {
+      if (msg && msg.event === 'changed') {
+        // 数据文件已在另一端改变，我们将拉取最新数据，并执行合并，随后无刷新重新渲染页面
+        await syncFromNativeHost();
+        await renderDashboard();
+      }
+    });
+
+    nativePort.onDisconnect.addListener(() => {
+      nativePort = null;
+      // 异常断开时，10秒后尝试重连，确保长连接的高可用性
+      setTimeout(setupNativePort, 10000);
+    });
+
+    nativeHostAvailable = true;
+  } catch (err) {
+    nativePort = null;
+  }
+}
+
 
 /* ----------------------------------------------------------------
    CHROME TABS — Direct API Access
@@ -1962,6 +1993,7 @@ function filterTabs(query) {
 
 document.addEventListener('DOMContentLoaded', async () => {
   await syncFromNativeHost();
+  setupNativePort();
   renderDashboard();
   setupSearchHandlers();
   setupBookmarkButtons();

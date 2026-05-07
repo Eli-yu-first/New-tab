@@ -2179,7 +2179,11 @@ function syncCustomSearchDropdown() {
   
   const val = originalSelect.value || 'google';
   currentText.textContent = val === 'google' ? 'Google' : val === 'bing' ? 'Microsoft Bing' : 'Baidu';
-  currentLogo.src = `https://www.google.com/s2/favicons?domain=${val === 'google' ? 'google.com' : val === 'bing' ? 'bing.com' : 'baidu.com'}&sz=32`;
+  if (val === 'bing') {
+    currentLogo.src = 'icons/bing.png';
+  } else {
+    currentLogo.src = `https://www.google.com/s2/favicons?domain=${val === 'google' ? 'google.com' : 'baidu.com'}&sz=32`;
+  }
   
   items.forEach(item => {
     if (item.dataset.value === val) {

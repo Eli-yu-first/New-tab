@@ -13,7 +13,7 @@ A hyper-smart, minimalistic, and unified browser New Tab extension.
 ---
 
 <div align="center">
-  <img src="assets/New-tab.png" alt="Tab New Dashboard Preview" width="100%">
+  <img width="1347" height="833" alt="image" src="https://github.com/user-attachments/assets/4e6ed9d6-9096-4c83-b64b-52f575058cf0" />
 </div>
 
 ---

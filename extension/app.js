@@ -33,6 +33,8 @@ let nativePort = null;
 
 // 缓存接收到的全端数据（含历史和打开标签页）
 let sharedNativeData = { bookmarks: [], deferred: [], openTabs: {}, history: [] };
+let activeContextBookmarkIndex = null;
+let isEditMode = false;
 
 /**
  * 智能自动检测当前浏览器品牌
@@ -1163,7 +1165,7 @@ function renderSimpleCard(title, items, sectionType) {
   const cardId = `simple-card-${sectionType}`;
   const isBookmarks = sectionType === 'bookmarks';
   
-  const pageChips = items.slice(0, 20).map((item, index) => {
+  const pageChips = items.slice(0, 50).map((item, index) => {
     let label = cleanTitle(smartTitle(stripTitleNoise(item.title || ''), item.url), '');
     const safeUrl   = (item.url || '').replace(/"/g, '&quot;');
     const safeTitle = label.replace(/"/g, '&quot;');
@@ -1171,32 +1173,16 @@ function renderSimpleCard(title, items, sectionType) {
     try { domain = new URL(item.url).hostname; } catch {}
     const faviconUrl = domain ? `https://www.google.com/s2/favicons?domain=${domain}&sz=16` : '';
 
-    const sortButtons = isBookmarks ? `
-      <div class="chip-sort">
-        <button class="sort-btn sort-up" data-action="move-up" data-index="${index}" title="Move up">
-          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M5 15l7-7 7 7" /></svg>
-        </button>
-        <button class="sort-btn sort-down" data-action="move-down" data-index="${index}" title="Move down">
-          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" /></svg>
-        </button>
-      </div>
-    ` : '';
+    const draggableAttr = isBookmarks ? ' draggable="true"' : '';
+    const extraClass = isBookmarks ? ' bookmark-chip' : '';
 
-    const deleteButton = isBookmarks ? `
-      <button class="chip-action chip-delete" data-action="delete-bookmark" data-tab-url="${safeUrl}" title="Delete bookmark">
-        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
-      </button>
-    ` : '';
-
-    return `<div class="page-chip clickable" data-action="focus-tab" data-tab-url="${safeUrl}" title="${safeTitle}" data-index="${index}">
+    return `<div class="page-chip clickable${extraClass}"${draggableAttr} data-action="focus-tab" data-tab-url="${safeUrl}" title="${safeTitle}" data-index="${index}">
       ${faviconUrl ? `<img class="chip-favicon" src="${faviconUrl}" alt="" onerror="this.style.display='none'">` : ''}
       <span class="chip-text">${label}</span>
       <div class="chip-actions">
-        ${sortButtons}
         ${isBookmarks ? '' : `<button class="chip-action chip-save" data-action="defer-single-tab" data-tab-url="${safeUrl}" data-tab-title="${safeTitle}" title="Save for later">
           <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M17.593 3.322c1.1.128 1.907 1.077 1.907 2.185V21L12 17.25 4.5 21V5.507c0-1.108.806-2.057 1.907-2.185a48.507 48.507 0 0 1 11.186 0Z" /></svg>
         </button>`}
-        ${deleteButton}
       </div>
     </div>`;
   }).join('');
@@ -1581,6 +1567,7 @@ async function renderStaticDashboard() {
   if (statTabs) statTabs.textContent = openTabs.length;
 
   checkTabOutDupes();
+  setupDragAndDrop();
 }
 
 async function renderDashboard() {
@@ -1934,21 +1921,154 @@ async function deleteCustomBookmark(url) {
   return false;
 }
 
-async function reorderCustomBookmark(currentIndex, direction) {
-  const bookmarks = await getCustomBookmarks();
-  const newIndex = currentIndex + direction;
-  if (newIndex < 0 || newIndex >= bookmarks.length) return false;
+/**
+ * 设置拖拽事件，实现纯 HTML5 拖拽上下排序
+ */
+let dragSourceEl = null;
 
-  const temp = bookmarks[currentIndex];
-  bookmarks[currentIndex] = bookmarks[newIndex];
-  bookmarks[newIndex] = temp;
+function setupDragAndDrop() {
+  const container = document.querySelector('#simple-card-bookmarks .mission-pages');
+  if (!container) return;
 
-  await saveCustomBookmarks(bookmarks);
-  return true;
+  const chips = container.querySelectorAll('.bookmark-chip');
+  chips.forEach((chip) => {
+    chip.addEventListener('dragstart', (e) => {
+      dragSourceEl = chip;
+      e.dataTransfer.effectAllowed = 'move';
+      e.dataTransfer.setData('text/html', chip.innerHTML);
+      chip.classList.add('dragging');
+    });
+
+    chip.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      return false;
+    });
+
+    chip.addEventListener('dragenter', (e) => {
+      if (chip !== dragSourceEl) {
+        chip.classList.add('drag-over');
+      }
+    });
+
+    chip.addEventListener('dragleave', (e) => {
+      chip.classList.remove('drag-over');
+    });
+
+    chip.addEventListener('drop', async (e) => {
+      e.stopPropagation();
+      e.preventDefault();
+
+      if (dragSourceEl !== chip) {
+        const srcIndex = parseInt(dragSourceEl.dataset.index, 10);
+        const targetIndex = parseInt(chip.dataset.index, 10);
+
+        if (!isNaN(srcIndex) && !isNaN(targetIndex)) {
+          const bookmarks = await getCustomBookmarks();
+          // 移除源项
+          const [moved] = bookmarks.splice(srcIndex, 1);
+          // 插入到目标位置
+          bookmarks.splice(targetIndex, 0, moved);
+
+          // 保存最新顺序并实时同步
+          await saveCustomBookmarks(bookmarks);
+          await renderDashboard();
+        }
+      }
+      return false;
+    });
+
+    chip.addEventListener('dragend', () => {
+      chips.forEach((c) => {
+        c.classList.remove('dragging');
+        c.classList.remove('drag-over');
+      });
+    });
+  });
 }
 
-async function addUrlToBookmarks(url, title) {
-  return await addCustomBookmark(url, title);
+/**
+ * 设置书签专用的右键上下文菜单事件绑定
+ */
+function setupContextMenu() {
+  const customMenu = document.getElementById('custom-context-menu');
+  if (!customMenu) return;
+
+  // 点击书签以外的任何地方隐藏菜单
+  document.addEventListener('click', (e) => {
+    if (!e.target.closest('#custom-context-menu')) {
+      customMenu.style.display = 'none';
+    }
+  });
+
+  // 绑定“修改”功能
+  const menuEdit = document.getElementById('menu-edit');
+  if (menuEdit) {
+    menuEdit.addEventListener('click', async () => {
+      customMenu.style.display = 'none';
+      if (activeContextBookmarkIndex !== null) {
+        const bookmarks = await getCustomBookmarks();
+        const item = bookmarks[activeContextBookmarkIndex];
+        if (item) {
+          isEditMode = true;
+          const modal = document.getElementById('bookmarkModal');
+          if (modal) {
+            const modalHeader = modal.querySelector('h3');
+            if (modalHeader) modalHeader.textContent = '修改书签';
+            
+            const modalUrl = document.getElementById('bookmarkModalUrl');
+            const modalTitle = document.getElementById('bookmarkModalTitle');
+            if (modalUrl) modalUrl.value = item.url;
+            if (modalTitle) modalTitle.value = item.title;
+            
+            modal.style.display = 'flex';
+            modalUrl.focus();
+          }
+        }
+      }
+    });
+  }
+
+  // 绑定“删除”功能
+  const menuDelete = document.getElementById('menu-delete');
+  if (menuDelete) {
+    menuDelete.addEventListener('click', async () => {
+      customMenu.style.display = 'none';
+      if (activeContextBookmarkIndex !== null) {
+        const bookmarks = await getCustomBookmarks();
+        if (activeContextBookmarkIndex >= 0 && activeContextBookmarkIndex < bookmarks.length) {
+          bookmarks.splice(activeContextBookmarkIndex, 1);
+          await saveCustomBookmarks(bookmarks);
+          showToast('书签已成功删除');
+          playCloseSound();
+          await renderDashboard();
+          activeContextBookmarkIndex = null;
+        }
+      }
+    });
+  }
+
+  // 右键事件全局拦截监听器（只处理书签卡片）
+  document.addEventListener('contextmenu', (e) => {
+    const bookmarkChip = e.target.closest('.bookmark-chip');
+    if (bookmarkChip) {
+      e.preventDefault();
+      activeContextBookmarkIndex = parseInt(bookmarkChip.dataset.index, 10);
+      
+      customMenu.style.display = 'block';
+      let x = e.pageX;
+      let y = e.pageY;
+      
+      const menuWidth = 140;
+      const menuHeight = 80;
+      if (x + menuWidth > window.innerWidth) x -= menuWidth;
+      if (y + menuHeight > window.innerHeight) y -= menuHeight;
+      
+      customMenu.style.left = `${x}px`;
+      customMenu.style.top = `${y}px`;
+    } else {
+      customMenu.style.display = 'none';
+    }
+  });
 }
 
 function setupBookmarkButtons() {
@@ -1961,6 +2081,9 @@ function setupBookmarkButtons() {
 
   if (addNewBtn && bookmarkModal) {
     addNewBtn.addEventListener('click', () => {
+      isEditMode = false;
+      const modalHeader = bookmarkModal.querySelector('h3');
+      if (modalHeader) modalHeader.textContent = 'Add new bookmark';
       modalUrl.value = '';
       modalTitle.value = '';
       bookmarkModal.style.display = 'flex';
@@ -1982,14 +2105,25 @@ function setupBookmarkButtons() {
         return;
       }
       
-      const success = await addCustomBookmark(url, title);
-
-      if (success) {
-        showToast('Bookmark added successfully');
-        closeModal();
-        await renderStaticDashboard();
+      if (isEditMode) {
+        if (activeContextBookmarkIndex !== null) {
+          const bookmarks = await getCustomBookmarks();
+          bookmarks[activeContextBookmarkIndex] = { url, title: title || url };
+          await saveCustomBookmarks(bookmarks);
+          showToast('书签已成功修改');
+          closeModal();
+          await renderDashboard();
+          activeContextBookmarkIndex = null;
+        }
       } else {
-        showToast('Failed to add bookmark');
+        const success = await addCustomBookmark(url, title);
+        if (success) {
+          showToast('Bookmark added successfully');
+          closeModal();
+          await renderStaticDashboard();
+        } else {
+          showToast('Failed to add bookmark');
+        }
       }
     });
     
@@ -2003,35 +2137,8 @@ function setupBookmarkButtons() {
     });
   }
 
-  document.addEventListener('click', async (e) => {
-    const sortBtn = e.target.closest('.sort-btn');
-    if (sortBtn) {
-      e.stopPropagation();
-      const action = sortBtn.dataset.action;
-      const index = parseInt(sortBtn.dataset.index, 10);
-
-      if (action === 'move-up') {
-        const success = await reorderCustomBookmark(index, -1);
-        if (success) await renderStaticDashboard();
-      } else if (action === 'move-down') {
-        const success = await reorderCustomBookmark(index, 1);
-        if (success) await renderStaticDashboard();
-      }
-      return;
-    }
-
-    const deleteBtn = e.target.closest('[data-action="delete-bookmark"]');
-    if (deleteBtn) {
-      e.stopPropagation();
-      const url = deleteBtn.dataset.tabUrl;
-      const success = await deleteCustomBookmark(url);
-      if (success) {
-        showToast('Bookmark deleted');
-        await renderStaticDashboard();
-      }
-      return;
-    }
-  });
+  // 初始化绑定书签卡片的右键上下文菜单
+  setupContextMenu();
 }
 
 /* ----------------------------------------------------------------

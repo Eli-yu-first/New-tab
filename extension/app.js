@@ -2192,10 +2192,12 @@ function syncCustomSearchDropdown() {
   
   const val = originalSelect.value || 'google';
   currentText.textContent = val === 'google' ? 'Google' : val === 'bing' ? 'Microsoft Bing' : 'Baidu';
-  if (val === 'bing') {
+  if (val === 'google') {
+    currentLogo.src = 'icons/google.png';
+  } else if (val === 'bing') {
     currentLogo.src = 'icons/bing.png';
   } else {
-    currentLogo.src = `https://www.google.com/s2/favicons?domain=${val === 'google' ? 'google.com' : 'baidu.com'}&sz=32`;
+    currentLogo.src = `https://www.google.com/s2/favicons?domain=baidu.com&sz=32`;
   }
   
   items.forEach(item => {

@@ -2385,7 +2385,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const existingNewTabs = allTabs.filter(t => {
           if (t.id === currentTab.id) return false;
           const u = t.url || '';
-          return u.startsWith(newtabUrl) || u.includes('damiopajfglhjglceemncgnndgkgjgjn');
+          return u.startsWith(newtabUrl) || u.includes('damiopajfglhjglceemncgnndgkgjgjn') || u === 'chrome://newtab/' || u === 'chrome://new-tab-page/';
         });
         
         if (existingNewTabs.length > 0) {

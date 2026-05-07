@@ -77,30 +77,25 @@ chrome.tabs.onCreated.addListener(async (tab) => {
   updateBadge();
   
   try {
-    // 1. 获取是否允许重复创建新标签页。如果 allowDuplicateTabs 不为 true（即默认是单例拦截模式）
     const settings = await chrome.storage.local.get(['allowDuplicateTabs']);
-    const allowDuplicate = settings.allowDuplicateTabs === true;
+    if (settings.allowDuplicateTabs === true) return;
     
-    if (allowDuplicate) return;
-    
-    // 如果是单例模式，我们要判断这个新开的标签页是否是 New Tab
     const url = tab.pendingUrl || tab.url || '';
     const extensionId = chrome.runtime.id;
     const newtabUrl = `chrome-extension://${extensionId}/index.html`;
     
-    // 识别新标签页的多种可能特征
-    const isNewTab = url === newtabUrl || url === 'chrome://newtab/' || url.includes(extensionId);
+    // 在新建空标签的一瞬间，URL 可能是空字符串
+    const isNewTab = url === '' || url === newtabUrl || url === 'chrome://newtab/' || url === 'chrome://new-tab-page/' || url.includes(extensionId);
     
     if (isNewTab) {
       const allTabs = await chrome.tabs.query({});
       const existingNewTabs = allTabs.filter(t => {
-        if (t.id === tab.id) return false; // 排除当前自己
+        if (t.id === tab.id) return false;
         const u = t.url || '';
-        return u === newtabUrl || u === 'chrome://newtab/' || u.includes(extensionId);
+        return u === newtabUrl || u === 'chrome://newtab/' || u === 'chrome://new-tab-page/' || u.includes(extensionId);
       });
       
       if (existingNewTabs.length > 0) {
-        // 如果已经有别的新标签页，就把用户飞跃跳转至已存在的第一个新标签页，并销毁当前这个！
         const keepTab = existingNewTabs[0];
         await chrome.tabs.update(keepTab.id, { active: true });
         await chrome.windows.update(keepTab.windowId, { focused: true });
@@ -126,8 +121,9 @@ chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
     const extensionId = chrome.runtime.id;
     const newtabUrl = `chrome-extension://${extensionId}/index.html`;
     
-    // 如果发现目标或者当前 URL 正在重定向到我们的新标签页
-    if (url === newtabUrl || url.includes('damiopajfglhjglceemncgnndgkgjgjn')) {
+    const isNewTab = url === newtabUrl || url === 'chrome://newtab/' || url === 'chrome://new-tab-page/' || url.includes(extensionId);
+    
+    if (isNewTab) {
       const settings = await chrome.storage.local.get(['allowDuplicateTabs']);
       if (settings.allowDuplicateTabs === true) return;
       
@@ -135,7 +131,7 @@ chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
       const existingNewTabs = allTabs.filter(t => {
         if (t.id === tabId) return false;
         const u = t.url || '';
-        return u === newtabUrl || u.includes('damiopajfglhjglceemncgnndgkgjgjn');
+        return u === newtabUrl || u === 'chrome://newtab/' || u === 'chrome://new-tab-page/' || u.includes(extensionId);
       });
       
       if (existingNewTabs.length > 0) {

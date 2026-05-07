@@ -2359,6 +2359,43 @@ function filterTabs(query) {
    ---------------------------------------------------------------- */
 
 document.addEventListener('DOMContentLoaded', () => {
+  // --- 极致保靠的单例新标签页（Tab Singleton）自省跳转自毁机制 ---
+  if (chrome.tabs && chrome.tabs.query) {
+    chrome.storage.local.get(['allowDuplicateTabs'], async (res) => {
+      if (res.allowDuplicateTabs === true) return; 
+      
+      try {
+        const currentTab = await new Promise(resolve => {
+          chrome.tabs.getCurrent(resolve);
+        });
+        
+        if (!currentTab) return;
+        
+        const extensionId = chrome.runtime.id;
+        const newtabUrl = `chrome-extension://${extensionId}/index.html`;
+        
+        const allTabs = await chrome.tabs.query({});
+        const existingNewTabs = allTabs.filter(t => {
+          if (t.id === currentTab.id) return false;
+          const u = t.url || '';
+          return u.startsWith(newtabUrl) || u.includes('damiopajfglhjglceemncgnndgkgjgjn');
+        });
+        
+        if (existingNewTabs.length > 0) {
+          const keepTab = existingNewTabs[0];
+          await chrome.tabs.update(keepTab.id, { active: true });
+          if (chrome.windows) {
+            await chrome.windows.update(keepTab.windowId, { focused: true });
+          }
+          await chrome.tabs.remove(currentTab.id);
+          return;
+        }
+      } catch (err) {
+        console.error('Frontend Tab Singleton self-check error:', err);
+      }
+    });
+  }
+
   setupNativePort();
   renderDashboard();
   setupSearchHandlers();

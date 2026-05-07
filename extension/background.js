@@ -118,8 +118,36 @@ chrome.tabs.onRemoved.addListener(() => {
 });
 
 // Update badge when a tab's URL changes (e.g. navigating to/from chrome://)
-chrome.tabs.onUpdated.addListener(() => {
+chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
   updateBadge();
+  
+  try {
+    const url = changeInfo.url || tab.url || '';
+    const extensionId = chrome.runtime.id;
+    const newtabUrl = `chrome-extension://${extensionId}/index.html`;
+    
+    // 如果发现目标或者当前 URL 正在重定向到我们的新标签页
+    if (url === newtabUrl || url.includes('damiopajfglhjglceemncgnndgkgjgjn')) {
+      const settings = await chrome.storage.local.get(['allowDuplicateTabs']);
+      if (settings.allowDuplicateTabs === true) return;
+      
+      const allTabs = await chrome.tabs.query({});
+      const existingNewTabs = allTabs.filter(t => {
+        if (t.id === tabId) return false;
+        const u = t.url || '';
+        return u === newtabUrl || u.includes('damiopajfglhjglceemncgnndgkgjgjn');
+      });
+      
+      if (existingNewTabs.length > 0) {
+        const keepTab = existingNewTabs[0];
+        await chrome.tabs.update(keepTab.id, { active: true });
+        await chrome.windows.update(keepTab.windowId, { focused: true });
+        await chrome.tabs.remove(tabId);
+      }
+    }
+  } catch (err) {
+    console.error('onUpdated singleton check error:', err);
+  }
 });
 
 // ─── Initial run ─────────────────────────────────────────────────────────────

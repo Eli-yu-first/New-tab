@@ -29,46 +29,7 @@
 
 const NATIVE_HOST_NAME = 'com.newtab.sync';
 let nativeHostAvailable = null; // null=未检测, true/false=已检测
-
-/**
- * 向 Native Messaging Host 发送一条消息并返回响应。
- * 若 Host 不可用则返回 null 并标记为不可用。
- */
-async function nativeSend(message) {
-  if (nativeHostAvailable === false) return null;
-  return new Promise((resolve) => {
-    try {
-      chrome.runtime.sendNativeMessage(NATIVE_HOST_NAME, message, (response) => {
-        if (chrome.runtime.lastError) {
-          nativeHostAvailable = false;
-          resolve(null);
-        } else {
-          nativeHostAvailable = true;
-          resolve(response);
-        }
-      });
-    } catch {
-      nativeHostAvailable = false;
-      resolve(null);
-    }
-  });
-}
-
-/**
- * 从共享文件读取全部数据。
- */
-async function nativeRead() {
-  const resp = await nativeSend({ action: 'read' });
-  if (resp && resp.success) return resp.data;
-  return null;
-}
-
-/**
- * 将全部数据写入共享文件。
- */
-async function nativeWrite(data) {
-  await nativeSend({ action: 'write', data });
-}
+let nativePort = null;
 
 /**
  * 合并两个 bookmarks 数组（以 URL 为唯一标识去重）。
@@ -95,51 +56,7 @@ function mergeDeferred(a, b) {
 }
 
 /**
- * 启动时执行一次：从共享文件读取数据，与本地 chrome.storage 合并，
- * 并将合并结果写回两侧，确保数据一致。
- */
-async function syncFromNativeHost() {
-  const shared = await nativeRead();
-  if (!shared) return; // Native Host 不可用，跳过
-
-  // 读取本地 chrome.storage 数据
-  const syncResult = await chrome.storage.sync.get(['deferred', BOOKMARKS_STORAGE_KEY]);
-  const localDeferred = syncResult.deferred || [];
-  const localBookmarks = syncResult[BOOKMARKS_STORAGE_KEY] || [];
-
-  // 合并
-  const mergedDeferred = mergeDeferred(shared.deferred || [], localDeferred);
-  const mergedBookmarks = mergeBookmarks(shared.bookmarks || [], localBookmarks);
-
-  // 写回两侧
-  await chrome.storage.sync.set({
-    deferred: mergedDeferred,
-    [BOOKMARKS_STORAGE_KEY]: mergedBookmarks,
-  });
-  await nativeWrite({ bookmarks: mergedBookmarks, deferred: mergedDeferred });
-}
-
-/**
- * 将当前数据推送到共享文件（写操作时调用）。
- */
-async function pushToNativeHost() {
-  if (nativeHostAvailable === false) return;
-  try {
-    const syncResult = await chrome.storage.sync.get(['deferred', BOOKMARKS_STORAGE_KEY]);
-    await nativeWrite({
-      bookmarks: syncResult[BOOKMARKS_STORAGE_KEY] || [],
-      deferred: syncResult.deferred || [],
-    });
-  } catch {
-    // 静默失败
-  }
-}
-
-let nativePort = null;
-
-/**
- * 建立与 Native Messaging Host 的常驻长连接，实时监听本地共享文件的变化。
- * 一旦检测到文件变化，自动无刷新重新合并并重绘整个 Dashboard 视图。
+ * 建立与 Native Messaging Host 的常驻长连接，实时双向合并数据。
  */
 function setupNativePort() {
   if (nativeHostAvailable === false) return;
@@ -148,21 +65,74 @@ function setupNativePort() {
     
     nativePort.onMessage.addListener(async (msg) => {
       if (msg && msg.event === 'changed') {
-        // 数据文件已在另一端改变，我们将拉取最新数据，并执行合并，随后无刷新重新渲染页面
-        await syncFromNativeHost();
+        const shared = msg.data;
+        if (!shared) return;
+
+        // 获取本地存储数据
+        const syncResult = await chrome.storage.sync.get(['deferred', BOOKMARKS_STORAGE_KEY]);
+        const localDeferred = syncResult.deferred || [];
+        const localBookmarks = syncResult[BOOKMARKS_STORAGE_KEY] || [];
+
+        // 合并数据
+        const mergedDeferred = mergeDeferred(shared.deferred || [], localDeferred);
+        const mergedBookmarks = mergeBookmarks(shared.bookmarks || [], localBookmarks);
+
+        // 检查是否有任何一端落后或发生变动，如果有才重新写入，严防死循环广播
+        const localChanged = JSON.stringify(mergedDeferred) !== JSON.stringify(localDeferred) ||
+                             JSON.stringify(mergedBookmarks) !== JSON.stringify(localBookmarks);
+        
+        const sharedChanged = JSON.stringify(mergedDeferred) !== JSON.stringify(shared.deferred || []) ||
+                              JSON.stringify(mergedBookmarks) !== JSON.stringify(shared.bookmarks || []);
+
+        if (localChanged) {
+          await chrome.storage.sync.set({
+            deferred: mergedDeferred,
+            [BOOKMARKS_STORAGE_KEY]: mergedBookmarks,
+          });
+        }
+
+        if (sharedChanged) {
+          // 如果合并后的最新数据和共享文件里的不一致，把更新同步回共享文件
+          nativePort.postMessage({
+            action: 'write',
+            data: { bookmarks: mergedBookmarks, deferred: mergedDeferred }
+          });
+        }
+
+        // 重新渲染控制台
         await renderDashboard();
       }
     });
 
     nativePort.onDisconnect.addListener(() => {
       nativePort = null;
-      // 异常断开时，10秒后尝试重连，确保长连接的高可用性
+      // 异常断开时，10 秒后自动重试，确保同步通路持续畅通
       setTimeout(setupNativePort, 10000);
     });
 
     nativeHostAvailable = true;
   } catch (err) {
     nativePort = null;
+    nativeHostAvailable = false;
+  }
+}
+
+/**
+ * 主动将最新数据推送到本地共享文件（当发生写操作时被调用）。
+ */
+async function pushToNativeHost() {
+  if (!nativePort) return;
+  try {
+    const syncResult = await chrome.storage.sync.get(['deferred', BOOKMARKS_STORAGE_KEY]);
+    nativePort.postMessage({
+      action: 'write',
+      data: {
+        bookmarks: syncResult[BOOKMARKS_STORAGE_KEY] || [],
+        deferred: syncResult.deferred || [],
+      }
+    });
+  } catch (err) {
+    console.error('[tab-out] pushToNativeHost error:', err);
   }
 }
 
@@ -1991,8 +1961,7 @@ function filterTabs(query) {
    INITIALIZATION
    ---------------------------------------------------------------- */
 
-document.addEventListener('DOMContentLoaded', async () => {
-  await syncFromNativeHost();
+document.addEventListener('DOMContentLoaded', () => {
   setupNativePort();
   renderDashboard();
   setupSearchHandlers();

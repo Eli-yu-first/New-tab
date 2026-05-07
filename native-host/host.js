@@ -2,7 +2,7 @@
 'use strict';
 
 /**
- * Native Messaging Host — 跨浏览器数据同步（常驻监听版）
+ * Native Messaging Host — 跨浏览器数据同步（常驻监听广播版）
  *
  * 通过 Chrome Native Messaging 协议，在本地文件系统中读写
  * 一个共享 JSON 文件（~/.newtab_sync/data.json）。
@@ -64,13 +64,13 @@ function startWatching() {
       if (watchTimeout) clearTimeout(watchTimeout);
       watchTimeout = setTimeout(() => {
         try {
-          // 主动向客户端广播文件已被改变的事件
-          sendNativeMessage({ event: 'changed' });
+          // 主动向客户端广播文件已被改变的最新数据
+          sendNativeMessage({ event: 'changed', data: readData() });
         } catch (e) {
           // 如果管道断开，安全退出进程
           process.exit(0);
         }
-      }, 100); // 100ms 防抖，避免写入时的多次高频事件
+      }, 80); // 80ms 防抖，避免多开页面时高频触发
     });
 
     watcher.on('error', () => {
@@ -85,7 +85,7 @@ function startWatching() {
   }
 }
 
-// ── Native Messaging 协议与粘包解析 ────────────────────────────────
+// ── Native Messaging 协议发送 ─────────────────────────────────────
 
 function sendNativeMessage(msg) {
   const json = JSON.stringify(msg);
@@ -103,10 +103,10 @@ function handleMessage(msg) {
       break;
     case 'write':
       writeData(msg.data);
-      sendNativeMessage({ success: true });
+      // 写入后不用回复成功，因为 fs.watch 被触发会自动向所有连接发送最新的 changed 广播
       break;
     case 'ping':
-      sendNativeMessage({ success: true, version: '1.1.0' });
+      sendNativeMessage({ success: true, version: '1.2.0' });
       break;
     default:
       sendNativeMessage({ success: false, error: 'Unknown action: ' + msg.action });
@@ -150,3 +150,10 @@ process.stdin.on('error', () => {
 
 // 启动文件实时监听
 startWatching();
+
+// 启动时自动向建立长连接的浏览器客户端推送一次当前最新数据
+try {
+  sendNativeMessage({ event: 'changed', data: readData() });
+} catch (e) {
+  process.exit(0);
+}

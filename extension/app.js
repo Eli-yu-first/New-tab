@@ -33,6 +33,7 @@ let nativePort = null;
 
 // 缓存接收到的全端数据（含历史和打开标签页）
 let sharedNativeData = { bookmarks: [], deferred: [], openTabs: {}, history: [] };
+let currentLanguage = 'zh';
 let activeContextBookmarkIndex = null;
 let isEditMode = false;
 
@@ -1004,7 +1005,13 @@ async function checkTabOutDupes() {
     });
 
     if (tabOutTabs.length > 1) {
-      if (countEl) countEl.textContent = tabOutTabs.length;
+      const cleanupText = document.querySelector('.tab-cleanup-banner .tab-cleanup-text');
+      if (cleanupText) {
+        const dict = LANG_DICT[currentLanguage] || LANG_DICT.zh;
+        cleanupText.innerHTML = `${dict.tabOutDupePrefix}<strong id="tabOutDupeCount">${tabOutTabs.length}</strong>${dict.tabOutDupeSuffix}`;
+      } else if (countEl) {
+        countEl.textContent = tabOutTabs.length;
+      }
       banner.style.display = 'flex';
     } else {
       banner.style.display = 'none';
@@ -2409,7 +2416,10 @@ document.addEventListener('DOMContentLoaded', () => {
     historySortBtn.addEventListener('click', async () => {
       historySortOrder = historySortOrder === 'time-desc' ? 'time-asc' : 'time-desc';
       const label = document.getElementById('historySortLabel');
-      if (label) label.textContent = historySortOrder === 'time-desc' ? '最新' : '最早';
+      if (label) {
+        const dict = LANG_DICT[currentLanguage] || LANG_DICT.zh;
+        label.textContent = historySortOrder === 'time-desc' ? dict.historySortBtnNewest : dict.historySortBtnOldest;
+      }
       await renderStaticDashboard();
     });
   }
@@ -2420,7 +2430,10 @@ document.addEventListener('DOMContentLoaded', () => {
     savedTabsSortBtn.addEventListener('click', async () => {
       savedTabsSortOrder = savedTabsSortOrder === 'time-desc' ? 'time-asc' : 'time-desc';
       const label = document.getElementById('savedTabsSortLabel');
-      if (label) label.textContent = savedTabsSortOrder === 'time-desc' ? '最新' : '最早';
+      if (label) {
+        const dict = LANG_DICT[currentLanguage] || LANG_DICT.zh;
+        label.textContent = savedTabsSortOrder === 'time-desc' ? dict.historySortBtnNewest : dict.historySortBtnOldest;
+      }
       await renderStaticDashboard();
     });
   }
@@ -2561,7 +2574,19 @@ const LANG_DICT = {
     bookmarkNameLabel: "名称",
     bookmarkUrlLabel: "网址",
     cancelText: "取消",
-    saveText: "保存"
+    saveText: "保存",
+    // 新增版块标题翻译
+    openTabsSectionTitle: "打开的标签页",
+    historySectionTitle: "历史记录",
+    savedTabsSectionTitle: "稍后阅读",
+    bookmarksSectionTitle: "书签",
+    // 排序标签
+    historySortBtnNewest: "最新",
+    historySortBtnOldest: "最早",
+    // 多开横幅文本模板
+    tabOutDupePrefix: "您目前多开了 ",
+    tabOutDupeSuffix: " 个新标签页，是否仅保留当前这一个？",
+    tabOutDupeBtnText: "关闭其它"
   },
   en: {
     settingsTitle: "System Settings",
@@ -2577,12 +2602,24 @@ const LANG_DICT = {
     bookmarkNameLabel: "Name",
     bookmarkUrlLabel: "URL",
     cancelText: "Cancel",
-    saveText: "Save"
+    saveText: "Save",
+    // 新增版块标题翻译
+    openTabsSectionTitle: "Open tabs",
+    historySectionTitle: "History",
+    savedTabsSectionTitle: "Saved for later",
+    bookmarksSectionTitle: "Bookmarks",
+    // 排序标签
+    historySortBtnNewest: "Newest",
+    historySortBtnOldest: "Oldest",
+    // 多开横幅文本模板
+    tabOutDupePrefix: "You have ",
+    tabOutDupeSuffix: " New Tab tabs open. Keep just this one?",
+    tabOutDupeBtnText: "Close extras"
   },
   ja: {
     settingsTitle: "システム設定",
     settingSingletonTitle: "シングルタブモード",
-    settingSingletonDesc: "有効にすると、新しく作成された空のタブは、重複を防ぎメモリを節約するために、既存の開いている空のタブに自動的にリダイレクトされます。",
+    settingSingletonDesc: "有効にすると、新しく作成された空のタブは、重複を防ぎメモリを節約するために、既存の開いている空のタブに自动的にリダイレクトされます。",
     settingLangTitle: "表示言語",
     settingFutureText: "✨ さらに多くの高級設定がまもなく登場します",
     tabSearchPlaceholder: "タブを検索...",
@@ -2593,7 +2630,19 @@ const LANG_DICT = {
     bookmarkNameLabel: "名前",
     bookmarkUrlLabel: "URL",
     cancelText: "キャンセル",
-    saveText: "保存"
+    saveText: "保存",
+    // 新增版块标题翻译
+    openTabsSectionTitle: "開いているタブ",
+    historySectionTitle: "履歴",
+    savedTabsSectionTitle: "後で読む",
+    bookmarksSectionTitle: "ブックマーク",
+    // 排序标签
+    historySortBtnNewest: "最新",
+    historySortBtnOldest: "最古",
+    // 多开横幅文本模板
+    tabOutDupePrefix: "現在、新しく開いたタブが ",
+    tabOutDupeSuffix: " 個あります。このタブだけを残しますか？",
+    tabOutDupeBtnText: "他を閉じる"
   }
 };
 
@@ -2601,6 +2650,8 @@ const LANG_DICT = {
  * 应用界面语言
  */
 function applyLanguage(lang) {
+  currentLanguage = lang; // 设定全局状态
+
   const dict = LANG_DICT[lang] || LANG_DICT.zh;
   
   const settingsTitle = document.getElementById('settingsTitle');
@@ -2624,7 +2675,34 @@ function applyLanguage(lang) {
   const searchInput = document.getElementById('searchInput');
   if (searchInput) searchInput.placeholder = dict.webSearchPlaceholder;
   
-  // 更新 Modal 的部分文本提示
+  // 1. 更新主卡片标题
+  const openTabsSectionTitle = document.getElementById('openTabsSectionTitle');
+  if (openTabsSectionTitle) openTabsSectionTitle.textContent = dict.openTabsSectionTitle;
+
+  const historySectionTitle = document.getElementById('historySectionTitle');
+  if (historySectionTitle) historySectionTitle.textContent = dict.historySectionTitle;
+
+  const savedTabsSectionTitle = document.getElementById('savedTabsSectionTitle');
+  if (savedTabsSectionTitle) savedTabsSectionTitle.textContent = dict.savedTabsSectionTitle;
+
+  const bookmarksSectionTitle = document.getElementById('bookmarksSectionTitle');
+  if (bookmarksSectionTitle) bookmarksSectionTitle.textContent = dict.bookmarksSectionTitle;
+
+  // 2. 更新排序按钮
+  const historySortLabel = document.getElementById('historySortLabel');
+  if (historySortLabel) {
+    historySortLabel.textContent = historySortOrder === 'time-desc' ? dict.historySortBtnNewest : dict.historySortBtnOldest;
+  }
+  const savedTabsSortLabel = document.getElementById('savedTabsSortLabel');
+  if (savedTabsSortLabel) {
+    savedTabsSortLabel.textContent = savedTabsSortOrder === 'time-desc' ? dict.historySortBtnNewest : dict.historySortBtnOldest;
+  }
+
+  // 3. 更新 Banner
+  const cleanupBannerBtn = document.querySelector('.tab-cleanup-banner .tab-cleanup-btn');
+  if (cleanupBannerBtn) cleanupBannerBtn.textContent = dict.tabOutDupeBtnText;
+
+  // 4. 更新 Modal 的部分文本提示
   const modalHeader = document.querySelector('#editBookmarkModal .modal-content h3');
   if (modalHeader) {
     modalHeader.textContent = dict.editBookmarkModalTitle;
@@ -2639,8 +2717,13 @@ function applyLanguage(lang) {
   const modalSaveBtn = document.getElementById('bookmarkModalSave');
   if (modalSaveBtn) modalSaveBtn.textContent = dict.saveText;
 
-  // 将语言设置存入持久化存储
+  // 5. 将语言设置存入持久化存储
   chrome.storage.local.set({ language: lang });
+
+  // 6. 重新执行一次多开及基本统计重置，以刷新带变量的翻译文本
+  if (typeof checkTabOutDupes === 'function') {
+    checkTabOutDupes();
+  }
 }
 
 /**

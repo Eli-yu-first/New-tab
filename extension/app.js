@@ -988,16 +988,29 @@ function getRealTabs() {
   });
 }
 
-function checkTabOutDupes() {
-  const tabOutTabs = openTabs.filter(t => t.isTabOut);
+async function checkTabOutDupes() {
   const banner  = document.getElementById('tabOutDupeBanner');
   const countEl = document.getElementById('tabOutDupeCount');
   if (!banner) return;
 
-  if (tabOutTabs.length > 1) {
-    if (countEl) countEl.textContent = tabOutTabs.length;
-    banner.style.display = 'flex';
-  } else {
+  try {
+    const extensionId = chrome.runtime.id;
+    const newtabUrl = `chrome-extension://${extensionId}/index.html`;
+    
+    const tabs = await chrome.tabs.query({});
+    const tabOutTabs = tabs.filter(t => {
+      const url = t.url || '';
+      return url === newtabUrl || url === 'chrome://newtab/' || url.includes('damiopajfglhjglceemncgnndgkgjgjn');
+    });
+
+    if (tabOutTabs.length > 1) {
+      if (countEl) countEl.textContent = tabOutTabs.length;
+      banner.style.display = 'flex';
+    } else {
+      banner.style.display = 'none';
+    }
+  } catch (err) {
+    console.error('checkTabOutDupes error:', err);
     banner.style.display = 'none';
   }
 }
@@ -1566,7 +1579,7 @@ async function renderStaticDashboard() {
   const statTabs = document.getElementById('statTabs');
   if (statTabs) statTabs.textContent = openTabs.length;
 
-  checkTabOutDupes();
+  await checkTabOutDupes();
   setupDragAndDrop();
 }
 

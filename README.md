@@ -1,6 +1,6 @@
 <div align="center">
 
-# 🚀 Tab New (Tab Out)
+# 🚀 Tab New
 **Keep tabs on your tabs.** 
 A hyper-smart, minimalistic, and unified browser New Tab extension.
 

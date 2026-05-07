@@ -2364,6 +2364,7 @@ document.addEventListener('DOMContentLoaded', () => {
   setupSearchHandlers();
   setupCustomDropdown();
   setupBookmarkButtons();
+  setupSettingsDrawer();
 
   // History排序按钮
   const historySortBtn = document.getElementById('historySortBtn');
@@ -2503,3 +2504,173 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 });
+
+/* ----------------------------------------------------------------
+   SYSTEM SETTINGS & MULTI-LANGUAGE
+   ---------------------------------------------------------------- */
+
+const LANG_DICT = {
+  zh: {
+    settingsTitle: "系统设置",
+    settingSingletonTitle: "标签单例模式",
+    settingSingletonDesc: "开启后，点击新建标签页时若已有打开的空白页，将自动飞跃跳转过去，防止多开重复新标签，节省系统内存。",
+    settingLangTitle: "界面语言",
+    settingFutureText: "✨ 更多高定设置功能将陆续上线",
+    tabSearchPlaceholder: "搜索标签页...",
+    webSearchPlaceholder: "输入网址或搜索内容...",
+    historySortLabelDesc: "排序: ",
+    statTabsDesc: "个标签页已打开",
+    editBookmarkModalTitle: "修改书签",
+    bookmarkNameLabel: "名称",
+    bookmarkUrlLabel: "网址",
+    cancelText: "取消",
+    saveText: "保存"
+  },
+  en: {
+    settingsTitle: "System Settings",
+    settingSingletonTitle: "Single-Instance Tab",
+    settingSingletonDesc: "When enabled, newly created blank tabs will automatically redirect to any existing open blank tab to prevent duplication and save memory.",
+    settingLangTitle: "Interface Language",
+    settingFutureText: "✨ More high-end settings coming soon",
+    tabSearchPlaceholder: "Search tabs...",
+    webSearchPlaceholder: "Search the web...",
+    historySortLabelDesc: "Sort: ",
+    statTabsDesc: "tabs open",
+    editBookmarkModalTitle: "Edit Bookmark",
+    bookmarkNameLabel: "Name",
+    bookmarkUrlLabel: "URL",
+    cancelText: "Cancel",
+    saveText: "Save"
+  },
+  ja: {
+    settingsTitle: "システム設定",
+    settingSingletonTitle: "シングルタブモード",
+    settingSingletonDesc: "有効にすると、新しく作成された空のタブは、重複を防ぎメモリを節約するために、既存の開いている空のタブに自動的にリダイレクトされます。",
+    settingLangTitle: "表示言語",
+    settingFutureText: "✨ さらに多くの高級設定がまもなく登場します",
+    tabSearchPlaceholder: "タブを検索...",
+    webSearchPlaceholder: "ウェブを検索...",
+    historySortLabelDesc: "並び替え: ",
+    statTabsDesc: "個のタブが開いています",
+    editBookmarkModalTitle: "ブックマークの編集",
+    bookmarkNameLabel: "名前",
+    bookmarkUrlLabel: "URL",
+    cancelText: "キャンセル",
+    saveText: "保存"
+  }
+};
+
+/**
+ * 应用界面语言
+ */
+function applyLanguage(lang) {
+  const dict = LANG_DICT[lang] || LANG_DICT.zh;
+  
+  const settingsTitle = document.getElementById('settingsTitle');
+  if (settingsTitle) settingsTitle.textContent = dict.settingsTitle;
+
+  const settingSingletonTitle = document.getElementById('settingSingletonTitle');
+  if (settingSingletonTitle) settingSingletonTitle.textContent = dict.settingSingletonTitle;
+
+  const settingSingletonDesc = document.getElementById('settingSingletonDesc');
+  if (settingSingletonDesc) settingSingletonDesc.textContent = dict.settingSingletonDesc;
+
+  const settingLangTitle = document.getElementById('settingLangTitle');
+  if (settingLangTitle) settingLangTitle.textContent = dict.settingLangTitle;
+
+  const settingFutureText = document.getElementById('settingFutureText');
+  if (settingFutureText) settingFutureText.textContent = dict.settingFutureText;
+
+  const tabSearchInput = document.getElementById('tabSearchInput');
+  if (tabSearchInput) tabSearchInput.placeholder = dict.tabSearchPlaceholder;
+
+  const searchInput = document.getElementById('searchInput');
+  if (searchInput) searchInput.placeholder = dict.webSearchPlaceholder;
+  
+  // 更新 Modal 的部分文本提示
+  const modalHeader = document.querySelector('#editBookmarkModal .modal-content h3');
+  if (modalHeader) {
+    modalHeader.textContent = dict.editBookmarkModalTitle;
+  }
+  const modalLabels = document.querySelectorAll('#editBookmarkModal .modal-content label');
+  if (modalLabels.length >= 2) {
+    modalLabels[0].textContent = dict.bookmarkUrlLabel;
+    modalLabels[1].textContent = dict.bookmarkNameLabel;
+  }
+  const modalCancelBtn = document.getElementById('bookmarkModalCancel');
+  if (modalCancelBtn) modalCancelBtn.textContent = dict.cancelText;
+  const modalSaveBtn = document.getElementById('bookmarkModalSave');
+  if (modalSaveBtn) modalSaveBtn.textContent = dict.saveText;
+
+  // 将语言设置存入持久化存储
+  chrome.storage.local.set({ language: lang });
+}
+
+/**
+ * 初始化系统设置抽屉和多语言交互
+ */
+function setupSettingsDrawer() {
+  const settingsBtn = document.getElementById('settingsBtn');
+  const settingsDrawer = document.getElementById('settingsDrawer');
+  const settingsOverlay = document.getElementById('settingsOverlay');
+  const settingsCloseBtn = document.getElementById('settingsCloseBtn');
+  const singletonCheck = document.getElementById('settingSingletonCheck');
+  const langCards = document.querySelectorAll('.language-card');
+
+  if (!settingsBtn || !settingsDrawer || !settingsOverlay || !settingsCloseBtn) return;
+
+  // 1. 打开抽屉
+  settingsBtn.addEventListener('click', () => {
+    settingsDrawer.classList.add('open');
+    settingsOverlay.classList.add('open');
+  });
+
+  // 2. 关闭抽屉
+  const closeDrawer = () => {
+    settingsDrawer.classList.remove('open');
+    settingsOverlay.classList.remove('open');
+  };
+  settingsCloseBtn.addEventListener('click', closeDrawer);
+  settingsOverlay.addEventListener('click', closeDrawer);
+
+  // 3. 单例 Tab 开关初始化与监听
+  chrome.storage.local.get(['allowDuplicateTabs'], (res) => {
+    const isSingletonEnabled = res.allowDuplicateTabs !== true; // 默认是开启单例 (true)
+    if (singletonCheck) {
+      singletonCheck.checked = isSingletonEnabled;
+    }
+  });
+
+  if (singletonCheck) {
+    singletonCheck.addEventListener('change', (e) => {
+      const isSingletonEnabled = e.target.checked;
+      chrome.storage.local.set({ allowDuplicateTabs: !isSingletonEnabled });
+    });
+  }
+
+  // 4. 多语言选择初始化与监听
+  chrome.storage.local.get(['language'], (res) => {
+    const currentLang = res.language || 'zh';
+    applyLanguage(currentLang);
+    
+    // 高亮对应的语言卡片
+    langCards.forEach(card => {
+      if (card.dataset.lang === currentLang) {
+        card.classList.add('active');
+      } else {
+        card.classList.remove('active');
+      }
+    });
+  });
+
+  langCards.forEach(card => {
+    card.addEventListener('click', () => {
+      const selectedLang = card.dataset.lang;
+      
+      langCards.forEach(c => c.classList.remove('active'));
+      card.classList.add('active');
+      
+      applyLanguage(selectedLang);
+    });
+  });
+}

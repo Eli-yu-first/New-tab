@@ -11,10 +11,11 @@
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-HOST_PATH="$SCRIPT_DIR/host.js"
+HOST_PATH="$SCRIPT_DIR/run.sh"
 HOST_NAME="com.newtab.sync"
 
-# 确保 host.js 可执行
+# 确保所有脚本可执行
+chmod +x "$SCRIPT_DIR/host.js"
 chmod +x "$HOST_PATH"
 
 echo "======================================"

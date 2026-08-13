@@ -305,9 +305,11 @@ test('history groups keep all records in an internal scroll container', () => {
   const markup = helpers.renderHistoryCard('今天', items, 'today');
 
   assert.equal((markup.match(/history-chip/g) || []).length, 10);
+  assert.match(markup, /history-group-card-today/);
   assert.match(markup, /history-group-scroll/);
   assert.doesNotMatch(markup, /page-chip-overflow/);
   assert.match(styleSource, /\.history-group-scroll\s*\{[\s\S]*?overflow-y:\s*auto/);
+  assert.match(styleSource, /\.history-group-card-today \.history-group-scroll\s*\{[\s\S]*?max-height:\s*552px/);
 });
 
 test('tab search candidates merge duplicate URLs and preserve all sources', () => {

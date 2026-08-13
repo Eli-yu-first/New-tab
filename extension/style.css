@@ -1741,6 +1741,11 @@ footer { animation: fadeUp 0.5s ease 0.65s both; }
   scrollbar-color: var(--warm-gray) transparent;
 }
 
+/* Today gets five additional single-line history rows before it scrolls. */
+.history-group-card-today .history-group-scroll {
+  max-height: 552px;
+}
+
 .history-group-scroll:focus-visible {
   outline: 2px solid rgba(200, 113, 58, 0.5);
   outline-offset: 3px;

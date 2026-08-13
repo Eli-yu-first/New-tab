@@ -1700,6 +1700,7 @@ function renderSimpleCard(title, items, sectionType) {
  */
 function renderHistoryCard(groupLabel, items, groupKey) {
   const cardId = `history-card-${groupKey}`;
+  const groupClass = groupKey === 'today' ? ' history-group-card-today' : '';
 
   function formatVisitTime(timestamp) {
     if (!timestamp) return '';
@@ -1744,7 +1745,7 @@ function renderHistoryCard(groupLabel, items, groupKey) {
   const historyChips = items.map(renderChip).join('');
 
   return `
-    <div class="mission-card history-group-card has-neutral-bar" id="${cardId}" data-group-key="${groupKey}">
+    <div class="mission-card history-group-card has-neutral-bar${groupClass}" id="${cardId}" data-group-key="${groupKey}">
       <div class="status-bar"></div>
       <div class="mission-content">
         <div class="mission-top">

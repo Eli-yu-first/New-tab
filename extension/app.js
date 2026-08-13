@@ -472,26 +472,12 @@ async function closeTabsExact(urls) {
 /**
  * focusTab(url)
  *
- * Switches Chrome to a tab only when its full URL matches. Different pages on
- * the same domain must open independently, otherwise a GitHub repository,
- * issue, or settings page can be mistaken for an already-open tab.
+ * Opens the requested URL in a new tab. Dashboard entries intentionally never
+ * reuse an existing tab, even when it has the same URL.
  */
 async function focusTab(url) {
   if (!url) return;
-  const allTabs = await chrome.tabs.query({});
-  const currentWindow = await chrome.windows.getCurrent();
-
-  const matches = allTabs.filter(t => t.url === url);
-
-  // 如果没有找到任何匹配的已打开页面，直接在新标签页中打开该链接
-  if (matches.length === 0) {
-    await chrome.tabs.create({ url });
-    return;
-  }
-
-  const match = matches.find(t => t.windowId !== currentWindow.id) || matches[0];
-  await chrome.tabs.update(match.id, { active: true });
-  await chrome.windows.update(match.windowId, { focused: true });
+  await chrome.tabs.create({ url });
 }
 
 /**
@@ -2760,12 +2746,7 @@ function getSearchTabById(id) {
 async function focusSearchTabById(id) {
   const tab = getSearchTabById(id);
   if (!tab) return;
-  if (Number.isInteger(tab.id)) {
-    await chrome.tabs.update(tab.id, { active: true });
-    await chrome.windows.update(tab.windowId, { focused: true });
-  } else {
-    await focusTab(tab.url);
-  }
+  await focusTab(tab.url);
   clearTabSearch();
 }
 

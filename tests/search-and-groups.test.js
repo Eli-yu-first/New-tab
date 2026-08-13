@@ -106,20 +106,17 @@ test('focusing a different URL on the same domain opens that specific URL', asyn
   assert.equal(tabCalls.updated.length, 0);
 });
 
-test('focusing the same full URL still activates its existing tab', async () => {
+test('focusing the same full URL still opens a new tab', async () => {
   const { helpers, tabCalls } = loadApp({
     tabs: [{ id: 7, url: 'https://github.com/acme/one', windowId: 2 }],
   });
 
   await helpers.focusTab('https://github.com/acme/one');
 
-  assert.equal(tabCalls.updated.length, 1);
-  assert.equal(tabCalls.updated[0][0], 7);
-  assert.equal(tabCalls.updated[0][1].active, true);
-  assert.equal(tabCalls.focusedWindows.length, 1);
-  assert.equal(tabCalls.focusedWindows[0][0], 2);
-  assert.equal(tabCalls.focusedWindows[0][1].focused, true);
-  assert.equal(tabCalls.created.length, 0);
+  assert.equal(tabCalls.created.length, 1);
+  assert.equal(tabCalls.created[0].url, 'https://github.com/acme/one');
+  assert.equal(tabCalls.updated.length, 0);
+  assert.equal(tabCalls.focusedWindows.length, 0);
 });
 
 test('saved tabs stay in named fixed groups and unknown groups fall back to ungrouped', () => {

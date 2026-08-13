@@ -62,6 +62,8 @@ function loadApp({ deferred = [], groups = [], tabs = [] } = {}) {
 
   vm.runInNewContext(`${appSource}\nglobalThis.__featureTest = {
     findTabSearchMatches,
+    buildTabSearchCandidates,
+    isImeComposing,
     buildSavedTabGroups,
     createSavedTabGroup,
     moveSavedTabToGroup,
@@ -92,6 +94,42 @@ test('tab search ranks a title match ahead of a URL-only match', () => {
   ]);
 
   assert.deepEqual(Array.from(matches, tab => tab.id), [1, 2]);
+});
+
+test('tab search recommends matching history and bookmarks alongside open tabs', () => {
+  const { helpers } = loadApp();
+  const candidates = helpers.buildTabSearchCandidates({
+    tabs: [{ id: 1, title: 'Project dashboard', url: 'https://app.example.test/project' }],
+    history: [{ title: 'Project deploy guide', url: 'https://docs.example.test/deploy', lastVisitTime: 50 }],
+    bookmarks: [{ title: 'Project repository', url: 'https://github.com/acme/project' }],
+  });
+  const matches = helpers.findTabSearchMatches('project', candidates);
+
+  assert.equal(matches.length, 3);
+  assert.deepEqual(
+    Array.from(matches, item => item.searchSources[0]).sort(),
+    ['bookmark', 'history', 'open']
+  );
+});
+
+test('tab search candidates merge duplicate URLs and preserve all sources', () => {
+  const { helpers } = loadApp();
+  const candidates = helpers.buildTabSearchCandidates({
+    tabs: [{ id: 1, title: 'Project', url: 'https://example.test/project' }],
+    history: [{ title: 'Project', url: 'https://example.test/project' }],
+    bookmarks: [{ title: 'Project', url: 'https://example.test/project' }],
+  });
+
+  assert.equal(candidates.length, 1);
+  assert.deepEqual(Array.from(candidates[0].searchSources), ['open', 'history', 'bookmark']);
+});
+
+test('IME composition Enter is not treated as a search submission', () => {
+  const { helpers } = loadApp();
+
+  assert.equal(helpers.isImeComposing({ isComposing: true, key: 'Enter' }), true);
+  assert.equal(helpers.isImeComposing({ keyCode: 229, key: 'Enter' }), true);
+  assert.equal(helpers.isImeComposing({ isComposing: false, key: 'Enter' }), false);
 });
 
 test('focusing a different URL on the same domain opens that specific URL', async () => {

@@ -1829,9 +1829,9 @@ document.addEventListener('click', async (e) => {
     return;
   }
 
-  if (action === 'focus-search-tab') {
+  if (action === 'open-search-result') {
     e.stopPropagation();
-    await focusSearchTabById(actionEl.dataset.tabId);
+    await openSearchResult(actionEl.dataset.searchUrl);
     return;
   }
 
@@ -2609,6 +2609,7 @@ function setupSearchHandlers() {
   
   if (searchInput) {
     searchInput.addEventListener('keydown', (e) => {
+      if (isImeComposing(e)) return;
       if (e.key === 'Enter') {
         const query = searchInput.value.trim();
         if (query) performSearch(query);
@@ -2625,6 +2626,7 @@ function setupSearchHandlers() {
     });
 
     tabSearchInput.addEventListener('keydown', async event => {
+      if (isImeComposing(event)) return;
       const results = document.querySelectorAll('.tab-search-result');
       if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
         event.preventDefault();
@@ -2641,9 +2643,9 @@ function setupSearchHandlers() {
       const selected = document.querySelector('.tab-search-result.is-selected');
       if (event.key === 'Enter' && selected) {
         event.preventDefault();
-        await focusSearchTabById(selected.dataset.tabId);
+        await openSearchResult(selected.dataset.searchUrl);
       }
-      if ((event.metaKey || event.ctrlKey) && event.key === 'Backspace' && selected) {
+      if ((event.metaKey || event.ctrlKey) && event.key === 'Backspace' && selected?.dataset.tabId) {
         event.preventDefault();
         await closeSearchTabById(selected.dataset.tabId);
       }
@@ -2658,6 +2660,10 @@ function setupSearchHandlers() {
       tabSearchInput?.select();
     }
   });
+}
+
+function isImeComposing(event) {
+  return Boolean(event?.isComposing) || event?.keyCode === 229;
 }
 
 function fuzzyScore(value, token) {
@@ -2701,29 +2707,95 @@ function findTabSearchMatches(query, tabs = openTabs) {
       score += titleScore * 5 + domainScore * 3 + urlScore;
     }
     return { ...tab, searchDomain: domain, searchScore: score };
-  }).filter(Boolean).sort((a, b) => b.searchScore - a.searchScore || String(a.title).localeCompare(String(b.title)));
+  }).filter(Boolean).sort((a, b) => {
+    const sourceRank = source => source.searchSources?.includes('open') ? 3
+      : source.searchSources?.includes('bookmark') ? 2
+      : 1;
+    return b.searchScore - a.searchScore ||
+      sourceRank(b) - sourceRank(a) ||
+      (b.lastVisitTime || 0) - (a.lastVisitTime || 0) ||
+      String(a.title).localeCompare(String(b.title));
+  });
 }
 
-function renderTabSearchResults(query) {
+function buildTabSearchCandidates({ tabs = [], history = [], bookmarks = [] } = {}) {
+  const byUrl = new Map();
+  const addItems = (items, source) => {
+    for (const item of items || []) {
+      if (!item?.url) continue;
+      const existing = byUrl.get(item.url);
+      if (existing) {
+        if (!existing.searchSources.includes(source)) existing.searchSources.push(source);
+        if (source === 'open') {
+          existing.id = item.id;
+          existing.remoteBrowser = item.remoteBrowser;
+          existing.title = item.title || existing.title;
+        } else if ((!existing.title || existing.title === existing.url) && item.title) {
+          existing.title = item.title;
+        }
+        existing.lastVisitTime = Math.max(existing.lastVisitTime || 0, item.lastVisitTime || 0);
+        continue;
+      }
+
+      byUrl.set(item.url, {
+        ...item,
+        searchSources: [source],
+        lastVisitTime: item.lastVisitTime || 0,
+      });
+    }
+  };
+
+  addItems(tabs, 'open');
+  addItems(history, 'history');
+  addItems(bookmarks, 'bookmark');
+  return Array.from(byUrl.values());
+}
+
+async function getTabSearchCandidates() {
+  const [history, bookmarks] = await Promise.all([getHistoryItems(), getBookmarks()]);
+  return buildTabSearchCandidates({ tabs: openTabs, history, bookmarks });
+}
+
+function getSearchSourceLabel(sources) {
+  if (sources?.includes('open')) return '打开标签';
+  if (sources?.includes('bookmark')) return '收藏';
+  return '历史';
+}
+
+let tabSearchRenderRequestId = 0;
+
+async function renderTabSearchResults(query) {
   const resultsEl = document.getElementById('tabSearchResults');
   if (!resultsEl) return;
-  const matches = findTabSearchMatches(query);
-  if (!query || matches.length === 0) {
+  const requestId = ++tabSearchRenderRequestId;
+  if (!query) {
     resultsEl.hidden = true;
     document.getElementById('tabSearchInput')?.setAttribute('aria-expanded', 'false');
-    resultsEl.innerHTML = query ? '<div class="tab-search-empty">No matching tabs</div>' : '';
+    resultsEl.innerHTML = '';
+    return;
+  }
+
+  const matches = findTabSearchMatches(query, await getTabSearchCandidates());
+  if (requestId !== tabSearchRenderRequestId) return;
+  if (matches.length === 0) {
+    resultsEl.hidden = false;
+    document.getElementById('tabSearchInput')?.setAttribute('aria-expanded', 'true');
+    resultsEl.innerHTML = '<div class="tab-search-empty">没有匹配内容</div>';
     return;
   }
 
   resultsEl.innerHTML = matches.map((tab, index) => `
-    <div class="tab-search-result${index === 0 ? ' is-selected' : ''}" data-tab-id="${escapeHtml(tab.id)}" role="option" aria-selected="${index === 0 ? 'true' : 'false'}">
-      <button class="tab-search-result-main" data-action="focus-search-tab" data-tab-id="${escapeHtml(tab.id)}">
+    <div class="tab-search-result${index === 0 ? ' is-selected' : ''}" data-search-url="${escapeHtml(tab.url)}"${tab.id != null ? ` data-tab-id="${escapeHtml(tab.id)}"` : ''} role="option" aria-selected="${index === 0 ? 'true' : 'false'}">
+      <button class="tab-search-result-main" data-action="open-search-result" data-search-url="${escapeHtml(tab.url)}">
         <span class="tab-search-result-title">${escapeHtml(tab.title || tab.url)}</span>
-        <span class="tab-search-result-url">${escapeHtml(tab.searchDomain || tab.url)}</span>
+        <span class="tab-search-result-meta">
+          <span class="tab-search-result-url">${escapeHtml(tab.searchDomain || tab.url)}</span>
+          <span class="tab-search-result-source">${getSearchSourceLabel(tab.searchSources)}</span>
+        </span>
       </button>
-      <button class="tab-search-result-close" data-action="close-search-tab" data-tab-id="${escapeHtml(tab.id)}" title="Close tab" aria-label="Close tab">
+      ${tab.id != null ? `<button class="tab-search-result-close" data-action="close-search-tab" data-tab-id="${escapeHtml(tab.id)}" title="Close tab" aria-label="Close tab">
         <svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" /></svg>
-      </button>
+      </button>` : ''}
     </div>`).join('');
   resultsEl.hidden = false;
   document.getElementById('tabSearchInput')?.setAttribute('aria-expanded', 'true');
@@ -2743,10 +2815,9 @@ function getSearchTabById(id) {
   return openTabs.find(tab => String(tab.id) === String(id));
 }
 
-async function focusSearchTabById(id) {
-  const tab = getSearchTabById(id);
-  if (!tab) return;
-  await focusTab(tab.url);
+async function openSearchResult(url) {
+  if (!url) return;
+  await focusTab(url);
   clearTabSearch();
 }
 

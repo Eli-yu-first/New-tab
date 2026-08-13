@@ -469,6 +469,27 @@ header {
   color: var(--muted);
 }
 
+.tab-search-result-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.tab-search-result-meta .tab-search-result-url {
+  min-width: 0;
+  flex: 1;
+}
+
+.tab-search-result-source {
+  flex-shrink: 0;
+  font-size: 9px;
+  color: var(--accent-sage);
+  border: 1px solid rgba(90, 122, 98, 0.25);
+  border-radius: 3px;
+  padding: 1px 4px;
+}
+
 .tab-search-result-close,
 .saved-group-action {
   display: inline-flex;

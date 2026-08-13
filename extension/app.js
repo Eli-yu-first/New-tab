@@ -38,12 +38,17 @@ let sharedNativeData = { bookmarks: [], deferred: [], savedTabGroups: [], openTa
 let currentLanguage = 'zh';
 let dashboardClockTimeZone = 'auto';
 let dashboardClockTimer = null;
+let dashboardClockVisibilityListenerBound = false;
 let activeContextBookmarkIndex = null;
 let isEditMode = false;
 let savedGroupEditingId = null;
 const handledCloseRequestIds = new Set();
 const handledHistoryDeletionIds = new Set();
 const locallyDeletedHistoryUrls = new Set();
+const DASHBOARD_WEATHER_CACHE_KEY = 'dashboardWeatherCache';
+const DASHBOARD_WEATHER_FAILURE_KEY = 'dashboardWeatherFailureAt';
+const DASHBOARD_WEATHER_CACHE_TTL_MS = 6 * 60 * 60 * 1000;
+const DASHBOARD_WEATHER_FAILURE_COOLDOWN_MS = 30 * 60 * 1000;
 
 function escapeHtml(value) {
   return String(value ?? '').replace(/[&<>"']/g, char => ({
@@ -109,13 +114,172 @@ function setDashboardClockTimeZone(timeZone) {
   updateDashboardClock();
 }
 
+function stopDashboardClock() {
+  if (!dashboardClockTimer) return;
+  clearTimeout(dashboardClockTimer);
+  dashboardClockTimer = null;
+}
+
+function scheduleDashboardClock() {
+  stopDashboardClock();
+  if (document.hidden) return;
+
+  updateDashboardClock();
+  const delay = 1000 - (Date.now() % 1000) + 16;
+  dashboardClockTimer = setTimeout(scheduleDashboardClock, delay);
+}
+
 function setupDashboardClock() {
   chrome.storage.local.get(['dashboardClockTimeZone'], result => {
     setDashboardClockTimeZone(result.dashboardClockTimeZone || 'auto');
   });
-  updateDashboardClock();
-  if (dashboardClockTimer) clearInterval(dashboardClockTimer);
-  dashboardClockTimer = setInterval(updateDashboardClock, 1000);
+  scheduleDashboardClock();
+
+  if (!dashboardClockVisibilityListenerBound) {
+    document.addEventListener('visibilitychange', scheduleDashboardClock);
+    dashboardClockVisibilityListenerBound = true;
+  }
+}
+
+function getDashboardWeatherDateKey(date = new Date(), timeZone = 'UTC') {
+  try {
+    const parts = new Intl.DateTimeFormat('en-US', {
+      calendar: 'gregory',
+      numberingSystem: 'latn',
+      timeZone,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    }).formatToParts(date).reduce((result, part) => {
+      result[part.type] = part.value;
+      return result;
+    }, {});
+    return `${parts.year}-${parts.month}-${parts.day}`;
+  } catch {
+    return date.toISOString().slice(0, 10);
+  }
+}
+
+function isDashboardWeatherCacheFresh(cache, now = new Date()) {
+  if (!cache || !Number.isFinite(cache.fetchedAt) || !cache.dateKey || !cache.timeZone) return false;
+
+  const age = now.getTime() - cache.fetchedAt;
+  return age >= 0
+    && age < DASHBOARD_WEATHER_CACHE_TTL_MS
+    && cache.dateKey === getDashboardWeatherDateKey(now, cache.timeZone);
+}
+
+function getDashboardWeatherPresentation(weatherCode) {
+  if (weatherCode === 0) return { icon: '\u2600', label: '晴' };
+  if ([1, 2].includes(weatherCode)) return { icon: '\u26c5', label: '少云' };
+  if (weatherCode === 3) return { icon: '\u2601', label: '多云' };
+  if ([45, 48].includes(weatherCode)) return { icon: '\u2248', label: '雾' };
+  if ([51, 53, 55, 56, 57].includes(weatherCode)) return { icon: '\u2614', label: '毛毛雨' };
+  if ([61, 63, 65, 66, 67, 80, 81, 82].includes(weatherCode)) return { icon: '\u2614', label: '雨' };
+  if ([71, 73, 75, 77, 85, 86].includes(weatherCode)) return { icon: '\u2744', label: '雪' };
+  if ([95, 96, 99].includes(weatherCode)) return { icon: '\u26a1', label: '雷雨' };
+  return { icon: '\u2601', label: '天气' };
+}
+
+function formatDashboardTemperatureRange(minTemperature, maxTemperature) {
+  if (!Number.isFinite(minTemperature) || !Number.isFinite(maxTemperature)) return '--\u00b0 - --\u00b0';
+  return `${Math.round(minTemperature)}\u00b0 - ${Math.round(maxTemperature)}\u00b0`;
+}
+
+function renderDashboardWeather(weather, state = 'ready') {
+  const container = document.getElementById('dashboardWeather');
+  const iconEl = document.getElementById('dashboardWeatherIcon');
+  const rangeEl = document.getElementById('dashboardWeatherRange');
+  if (!container || !iconEl || !rangeEl) return;
+
+  if (state !== 'ready' || !weather) {
+    iconEl.textContent = state === 'loading' ? '\u2026' : '\u2601';
+    rangeEl.textContent = state === 'loading' ? '获取天气...' : '天气不可用';
+    container.title = state === 'loading' ? '正在获取今日天气' : '无法获取今日天气';
+    return;
+  }
+
+  const presentation = getDashboardWeatherPresentation(weather.weatherCode);
+  const range = formatDashboardTemperatureRange(weather.minTemperature, weather.maxTemperature);
+  iconEl.textContent = presentation.icon;
+  rangeEl.textContent = range;
+  container.title = `${presentation.label}，${range}`;
+}
+
+function getCurrentDashboardWeatherLocation() {
+  if (!navigator.geolocation) return Promise.reject(new Error('Geolocation unavailable'));
+
+  return new Promise((resolve, reject) => {
+    navigator.geolocation.getCurrentPosition(resolve, reject, {
+      enableHighAccuracy: false,
+      timeout: 8000,
+      maximumAge: DASHBOARD_WEATHER_CACHE_TTL_MS,
+    });
+  });
+}
+
+async function fetchDashboardWeather() {
+  const position = await getCurrentDashboardWeatherLocation();
+  const url = new URL('https://api.open-meteo.com/v1/forecast');
+  url.search = new URLSearchParams({
+    latitude: String(position.coords.latitude),
+    longitude: String(position.coords.longitude),
+    daily: 'weather_code,temperature_2m_max,temperature_2m_min',
+    timezone: 'auto',
+    forecast_days: '1',
+  }).toString();
+
+  const response = await fetch(url);
+  if (!response.ok) throw new Error(`Weather request failed: ${response.status}`);
+
+  const data = await response.json();
+  const weatherCode = data?.daily?.weather_code?.[0];
+  const minTemperature = data?.daily?.temperature_2m_min?.[0];
+  const maxTemperature = data?.daily?.temperature_2m_max?.[0];
+  if (!Number.isFinite(weatherCode) || !Number.isFinite(minTemperature) || !Number.isFinite(maxTemperature)) {
+    throw new Error('Weather response is incomplete');
+  }
+
+  const timeZone = data.timezone || getSystemTimeZone();
+  const fetchedAt = Date.now();
+  return {
+    weatherCode,
+    minTemperature,
+    maxTemperature,
+    timeZone,
+    dateKey: getDashboardWeatherDateKey(new Date(fetchedAt), timeZone),
+    fetchedAt,
+  };
+}
+
+function setupDashboardWeather() {
+  renderDashboardWeather(null, 'loading');
+  chrome.storage.local.get([DASHBOARD_WEATHER_CACHE_KEY, DASHBOARD_WEATHER_FAILURE_KEY], async result => {
+    const now = new Date();
+    const cache = result[DASHBOARD_WEATHER_CACHE_KEY];
+    if (isDashboardWeatherCacheFresh(cache, now)) {
+      renderDashboardWeather(cache);
+      return;
+    }
+
+    const failedAt = result[DASHBOARD_WEATHER_FAILURE_KEY];
+    if (Number.isFinite(failedAt) && now.getTime() - failedAt < DASHBOARD_WEATHER_FAILURE_COOLDOWN_MS) {
+      renderDashboardWeather(null, 'unavailable');
+      return;
+    }
+
+    try {
+      const weather = await fetchDashboardWeather();
+      chrome.storage.local.set({
+        [DASHBOARD_WEATHER_CACHE_KEY]: weather,
+        [DASHBOARD_WEATHER_FAILURE_KEY]: null,
+      });
+      renderDashboardWeather(weather);
+    } catch {
+      chrome.storage.local.set({ [DASHBOARD_WEATHER_FAILURE_KEY]: now.getTime() });
+      renderDashboardWeather(null, 'unavailable');
+    }
+  });
 }
 
 function isTrackableTabUrl(url) {
@@ -2914,6 +3078,7 @@ function clearTabSearch() {
 document.addEventListener('DOMContentLoaded', () => {
   setupNativePort();
   setupDashboardClock();
+  setupDashboardWeather();
   renderDashboard();
   setupSearchHandlers();
   setupCustomDropdown();

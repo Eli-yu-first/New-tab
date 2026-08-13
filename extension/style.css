@@ -99,12 +99,45 @@ header {
   margin: 0 auto;
 }
 
-.dashboard-clock {
+.dashboard-weather {
   position: absolute;
   left: 0;
   top: 50%;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 112px;
   transform: translateY(-50%);
-  min-width: 176px;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
+}
+
+.dashboard-weather-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  color: var(--accent-amber);
+  font-size: 22px;
+  line-height: 1;
+}
+
+.dashboard-weather-range {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.dashboard-clock {
+  position: absolute;
+  left: 128px;
+  top: 50%;
+  transform: translateY(-50%);
+  min-width: 140px;
   color: var(--ink);
   font-variant-numeric: tabular-nums;
   pointer-events: none;
@@ -2010,6 +2043,13 @@ footer { animation: fadeUp 0.5s ease 0.65s both; }
     order: -1;
     width: 100%;
     text-align: center;
+    transform: none;
+  }
+
+  .dashboard-weather {
+    position: static;
+    order: -2;
+    width: auto;
     transform: none;
   }
 

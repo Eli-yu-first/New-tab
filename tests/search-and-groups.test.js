@@ -78,6 +78,9 @@ function loadApp({ deferred = [], groups = [], tabs = [], bookmarks = [] } = {})
     isImeComposing,
     formatDashboardClock,
     getEffectiveClockTimeZone,
+    isDashboardWeatherCacheFresh,
+    getDashboardWeatherPresentation,
+    formatDashboardTemperatureRange,
     buildSavedTabGroups,
     createSavedTabGroup,
     moveSavedTabToGroup,
@@ -115,6 +118,32 @@ test('dashboard clock uses the system time zone for automatic and invalid settin
   const systemTimeZone = helpers.getEffectiveClockTimeZone('auto');
 
   assert.equal(helpers.getEffectiveClockTimeZone('not/a-time-zone'), systemTimeZone);
+});
+
+test('dashboard weather cache is valid only for the same local day and six-hour window', () => {
+  const { helpers } = loadApp();
+  const cache = {
+    weatherCode: 0,
+    minTemperature: 23.2,
+    maxTemperature: 31.8,
+    timeZone: 'Asia/Shanghai',
+    dateKey: '2026-08-13',
+    fetchedAt: new Date('2026-08-13T00:00:00.000Z').getTime(),
+  };
+
+  assert.equal(helpers.isDashboardWeatherCacheFresh(cache, new Date('2026-08-13T05:59:59.000Z')), true);
+  assert.equal(helpers.isDashboardWeatherCacheFresh(cache, new Date('2026-08-13T06:00:00.000Z')), false);
+  assert.equal(helpers.isDashboardWeatherCacheFresh(cache, new Date('2026-08-13T16:00:00.000Z')), false);
+});
+
+test('dashboard weather maps weather codes and formats compact temperature ranges', () => {
+  const { helpers } = loadApp();
+
+  assert.equal(helpers.getDashboardWeatherPresentation(0).icon, '\u2600');
+  assert.equal(helpers.getDashboardWeatherPresentation(63).icon, '\u2614');
+  assert.equal(helpers.getDashboardWeatherPresentation(95).icon, '\u26a1');
+  assert.equal(helpers.formatDashboardTemperatureRange(23.2, 31.8), '23\u00b0 - 32\u00b0');
+  assert.equal(helpers.formatDashboardTemperatureRange(undefined, 31.8), '--\u00b0 - --\u00b0');
 });
 
 test('tab search ranks a title match ahead of a URL-only match', () => {

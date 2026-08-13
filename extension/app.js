@@ -49,6 +49,7 @@ const DASHBOARD_WEATHER_CACHE_KEY = 'dashboardWeatherCache';
 const DASHBOARD_WEATHER_FAILURE_KEY = 'dashboardWeatherFailureAt';
 const DASHBOARD_WEATHER_CACHE_TTL_MS = 6 * 60 * 60 * 1000;
 const DASHBOARD_WEATHER_FAILURE_COOLDOWN_MS = 30 * 60 * 1000;
+let dashboardWeatherLoadInProgress = false;
 
 function escapeHtml(value) {
   return String(value ?? '').replace(/[&<>"']/g, char => ({
@@ -195,7 +196,14 @@ function renderDashboardWeather(weather, state = 'ready') {
   if (state !== 'ready' || !weather) {
     iconEl.textContent = state === 'loading' ? '\u2026' : '\u2601';
     rangeEl.textContent = state === 'loading' ? '获取天气...' : '天气不可用';
-    container.title = state === 'loading' ? '正在获取今日天气' : '无法获取今日天气';
+    const isRetryable = state === 'unavailable';
+    container.classList.toggle('is-retryable', isRetryable);
+    container.setAttribute('role', isRetryable ? 'button' : 'status');
+    container.tabIndex = isRetryable ? 0 : -1;
+    container.title = state === 'loading'
+      ? '正在获取今日天气'
+      : '无法获取今日天气，点击重试';
+    container.setAttribute('aria-label', isRetryable ? '天气不可用，点击重试' : '正在获取今日天气');
     return;
   }
 
@@ -203,7 +211,11 @@ function renderDashboardWeather(weather, state = 'ready') {
   const range = formatDashboardTemperatureRange(weather.minTemperature, weather.maxTemperature);
   iconEl.textContent = presentation.icon;
   rangeEl.textContent = range;
+  container.classList.remove('is-retryable');
+  container.setAttribute('role', 'status');
+  container.tabIndex = -1;
   container.title = `${presentation.label}，${range}`;
+  container.setAttribute('aria-label', `今日天气：${presentation.label}，${range}`);
 }
 
 function getCurrentDashboardWeatherLocation() {
@@ -218,12 +230,37 @@ function getCurrentDashboardWeatherLocation() {
   });
 }
 
+async function getDashboardWeatherLocationFromIp() {
+  const response = await fetch('https://ipinfo.io/json');
+  if (!response.ok) throw new Error(`IP location request failed: ${response.status}`);
+
+  const data = await response.json();
+  const [latitude, longitude] = String(data.loc || '').split(',').map(Number);
+  if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
+    throw new Error('IP location response is incomplete');
+  }
+
+  return { latitude, longitude };
+}
+
+async function getDashboardWeatherLocation() {
+  try {
+    const position = await getCurrentDashboardWeatherLocation();
+    return {
+      latitude: position.coords.latitude,
+      longitude: position.coords.longitude,
+    };
+  } catch {
+    return getDashboardWeatherLocationFromIp();
+  }
+}
+
 async function fetchDashboardWeather() {
-  const position = await getCurrentDashboardWeatherLocation();
+  const location = await getDashboardWeatherLocation();
   const url = new URL('https://api.open-meteo.com/v1/forecast');
   url.search = new URLSearchParams({
-    latitude: String(position.coords.latitude),
-    longitude: String(position.coords.longitude),
+    latitude: String(location.latitude),
+    longitude: String(location.longitude),
     daily: 'weather_code,temperature_2m_max,temperature_2m_min',
     timezone: 'auto',
     forecast_days: '1',
@@ -252,19 +289,23 @@ async function fetchDashboardWeather() {
   };
 }
 
-function setupDashboardWeather() {
+function loadDashboardWeather({ force = false } = {}) {
+  if (dashboardWeatherLoadInProgress) return;
+  dashboardWeatherLoadInProgress = true;
   renderDashboardWeather(null, 'loading');
   chrome.storage.local.get([DASHBOARD_WEATHER_CACHE_KEY, DASHBOARD_WEATHER_FAILURE_KEY], async result => {
     const now = new Date();
     const cache = result[DASHBOARD_WEATHER_CACHE_KEY];
     if (isDashboardWeatherCacheFresh(cache, now)) {
       renderDashboardWeather(cache);
+      dashboardWeatherLoadInProgress = false;
       return;
     }
 
     const failedAt = result[DASHBOARD_WEATHER_FAILURE_KEY];
-    if (Number.isFinite(failedAt) && now.getTime() - failedAt < DASHBOARD_WEATHER_FAILURE_COOLDOWN_MS) {
+    if (!force && Number.isFinite(failedAt) && now.getTime() - failedAt < DASHBOARD_WEATHER_FAILURE_COOLDOWN_MS) {
       renderDashboardWeather(null, 'unavailable');
+      dashboardWeatherLoadInProgress = false;
       return;
     }
 
@@ -278,8 +319,27 @@ function setupDashboardWeather() {
     } catch {
       chrome.storage.local.set({ [DASHBOARD_WEATHER_FAILURE_KEY]: now.getTime() });
       renderDashboardWeather(null, 'unavailable');
+    } finally {
+      dashboardWeatherLoadInProgress = false;
     }
   });
+}
+
+function setupDashboardWeather() {
+  const weatherEl = document.getElementById('dashboardWeather');
+  if (weatherEl) {
+    const retryWeather = () => {
+      if (weatherEl.classList.contains('is-retryable')) loadDashboardWeather({ force: true });
+    };
+    weatherEl.addEventListener('click', retryWeather);
+    weatherEl.addEventListener('keydown', event => {
+      if (event.key === 'Enter' || event.key === ' ') {
+        event.preventDefault();
+        retryWeather();
+      }
+    });
+  }
+  loadDashboardWeather();
 }
 
 function isTrackableTabUrl(url) {

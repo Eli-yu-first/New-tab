@@ -8,7 +8,7 @@ const vm = require('node:vm');
 
 const appSource = fs.readFileSync(path.join(__dirname, '..', 'extension', 'app.js'), 'utf8');
 
-function loadApp({ deferred = [], groups = [], tabs = [], bookmarks = [] } = {}) {
+function loadApp({ deferred = [], groups = [], tabs = [], bookmarks = [], fetchImpl, geolocation } = {}) {
   const syncData = {
     deferred,
     tabOut_savedTabGroups: groups,
@@ -18,6 +18,7 @@ function loadApp({ deferred = [], groups = [], tabs = [], bookmarks = [] } = {})
   const tabCalls = { created: [], updated: [], focusedWindows: [] };
   const context = {
     URL,
+    URLSearchParams,
     console,
     setTimeout,
     clearTimeout,
@@ -27,7 +28,8 @@ function loadApp({ deferred = [], groups = [], tabs = [], bookmarks = [] } = {})
       querySelector() { return null; },
       querySelectorAll() { return []; },
     },
-    navigator: { userAgent: 'Chrome' },
+    navigator: { userAgent: 'Chrome', geolocation },
+    fetch: fetchImpl,
     window: {},
     chrome: {
       runtime: { id: 'test-extension' },
@@ -81,6 +83,7 @@ function loadApp({ deferred = [], groups = [], tabs = [], bookmarks = [] } = {})
     isDashboardWeatherCacheFresh,
     getDashboardWeatherPresentation,
     formatDashboardTemperatureRange,
+    fetchDashboardWeather,
     buildSavedTabGroups,
     createSavedTabGroup,
     moveSavedTabToGroup,
@@ -144,6 +147,48 @@ test('dashboard weather maps weather codes and formats compact temperature range
   assert.equal(helpers.getDashboardWeatherPresentation(95).icon, '\u26a1');
   assert.equal(helpers.formatDashboardTemperatureRange(23.2, 31.8), '23\u00b0 - 32\u00b0');
   assert.equal(helpers.formatDashboardTemperatureRange(undefined, 31.8), '--\u00b0 - --\u00b0');
+});
+
+test('dashboard weather falls back to IP location when browser geolocation is unavailable', async () => {
+  const requests = [];
+  const { helpers } = loadApp({
+    geolocation: {
+      getCurrentPosition(_resolve, reject) {
+        reject(new Error('Location denied'));
+      },
+    },
+    fetchImpl: async url => {
+      const requestUrl = String(url);
+      requests.push(requestUrl);
+      if (requestUrl === 'https://ipinfo.io/json') {
+        return {
+          ok: true,
+          json: async () => ({ loc: '31.2304,121.4737' }),
+        };
+      }
+      return {
+        ok: true,
+        json: async () => ({
+          timezone: 'Asia/Shanghai',
+          daily: {
+            weather_code: [2],
+            temperature_2m_min: [24.4],
+            temperature_2m_max: [32.1],
+          },
+        }),
+      };
+    },
+  });
+
+  const weather = await helpers.fetchDashboardWeather();
+
+  assert.equal(weather.weatherCode, 2);
+  assert.equal(weather.minTemperature, 24.4);
+  assert.equal(weather.maxTemperature, 32.1);
+  assert.equal(requests[0], 'https://ipinfo.io/json');
+  assert.match(requests[1], /^https:\/\/api\.open-meteo\.com\/v1\/forecast\?/);
+  assert.match(requests[1], /latitude=31.2304/);
+  assert.match(requests[1], /longitude=121.4737/);
 });
 
 test('tab search ranks a title match ahead of a URL-only match', () => {

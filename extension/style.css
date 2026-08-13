@@ -113,6 +113,17 @@ header {
   pointer-events: none;
 }
 
+.dashboard-weather.is-retryable {
+  cursor: pointer;
+  pointer-events: auto;
+}
+
+.dashboard-weather.is-retryable:focus-visible {
+  border-radius: 4px;
+  outline: 2px solid var(--accent-amber);
+  outline-offset: 4px;
+}
+
 .dashboard-weather-icon {
   display: inline-flex;
   align-items: center;

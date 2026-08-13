@@ -8,6 +8,7 @@ const vm = require('node:vm');
 
 const appSource = fs.readFileSync(path.join(__dirname, '..', 'extension', 'app.js'), 'utf8');
 const indexHtml = fs.readFileSync(path.join(__dirname, '..', 'extension', 'index.html'), 'utf8');
+const styleSource = fs.readFileSync(path.join(__dirname, '..', 'extension', 'style.css'), 'utf8');
 
 function loadApp({ deferred = [], groups = [], tabs = [], bookmarks = [], fetchImpl, geolocation } = {}) {
   const syncData = {
@@ -78,6 +79,7 @@ function loadApp({ deferred = [], groups = [], tabs = [], bookmarks = [], fetchI
     findTabSearchMatches,
     buildTabSearchCandidates,
     getSearchResultFaviconUrl,
+    getSearchSourceMeta,
     isImeComposing,
     formatDashboardClock,
     getEffectiveClockTimeZone,
@@ -89,6 +91,7 @@ function loadApp({ deferred = [], groups = [], tabs = [], bookmarks = [], fetchI
     renderSimpleCard,
     addCustomBookmark,
     shouldDismissTabSearchResults,
+    renderHistoryCard,
     buildSavedTabGroups,
     createSavedTabGroup,
     moveSavedTabToGroup,
@@ -263,6 +266,48 @@ test('tab search recommends matching history and bookmarks alongside open tabs',
     Array.from(matches, item => item.searchSources[0]).sort(),
     ['bookmark', 'history', 'open']
   );
+});
+
+test('tab-search sorts open tabs, bookmarks, then recent history with distinct source metadata', () => {
+  const { helpers } = loadApp();
+  const matches = helpers.findTabSearchMatches('project', helpers.buildTabSearchCandidates({
+    tabs: [{ id: 1, title: 'Project open', url: 'https://open.example.test/project' }],
+    bookmarks: [{ title: 'Project bookmark', url: 'https://bookmark.example.test/project' }],
+    history: [
+      { title: 'Project old history', url: 'https://history.example.test/old-project', lastVisitTime: 10 },
+      { title: 'Project recent history', url: 'https://history.example.test/recent-project', lastVisitTime: 20 },
+    ],
+  }));
+
+  assert.deepEqual(Array.from(matches, item => item.searchSources[0]), ['open', 'bookmark', 'history', 'history']);
+  assert.equal(matches[2].title, 'Project recent history');
+  assert.deepEqual(
+    JSON.parse(JSON.stringify(helpers.getSearchSourceMeta(['open']))),
+    { label: '打开标签', className: 'tab-search-source-open', rank: 3 }
+  );
+  assert.deepEqual(
+    JSON.parse(JSON.stringify(helpers.getSearchSourceMeta(['bookmark']))),
+    { label: '收藏', className: 'tab-search-source-bookmark', rank: 2 }
+  );
+  assert.deepEqual(
+    JSON.parse(JSON.stringify(helpers.getSearchSourceMeta(['history']))),
+    { label: '历史', className: 'tab-search-source-history', rank: 1 }
+  );
+});
+
+test('history groups keep all records in an internal scroll container', () => {
+  const { helpers } = loadApp();
+  const items = Array.from({ length: 10 }, (_, index) => ({
+    title: `History ${index}`,
+    url: `https://history.example.test/${index}`,
+    lastVisitTime: Date.now() - index * 1000,
+  }));
+  const markup = helpers.renderHistoryCard('今天', items, 'today');
+
+  assert.equal((markup.match(/history-chip/g) || []).length, 10);
+  assert.match(markup, /history-group-scroll/);
+  assert.doesNotMatch(markup, /page-chip-overflow/);
+  assert.match(styleSource, /\.history-group-scroll\s*\{[\s\S]*?overflow-y:\s*auto/);
 });
 
 test('tab search candidates merge duplicate URLs and preserve all sources', () => {

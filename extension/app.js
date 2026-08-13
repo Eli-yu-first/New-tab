@@ -1700,9 +1700,6 @@ function renderSimpleCard(title, items, sectionType) {
  */
 function renderHistoryCard(groupLabel, items, groupKey) {
   const cardId = `history-card-${groupKey}`;
-  const maxVisible = 8;
-  const visibleItems = items.slice(0, maxVisible);
-  const hiddenItems = items.slice(maxVisible);
 
   function formatVisitTime(timestamp) {
     if (!timestamp) return '';
@@ -1744,16 +1741,7 @@ function renderHistoryCard(groupLabel, items, groupKey) {
     </div>`;
   }
 
-  const visibleChips = visibleItems.map(renderChip).join('');
-  let overflowHtml = '';
-  if (hiddenItems.length > 0) {
-    const hiddenChips = hiddenItems.map(renderChip).join('');
-    overflowHtml = `
-      <div class="page-chips-overflow" style="display:none">${hiddenChips}</div>
-      <div class="page-chip page-chip-overflow clickable" data-action="expand-chips">
-        <span class="chip-text">+${hiddenItems.length} more</span>
-      </div>`;
-  }
+  const historyChips = items.map(renderChip).join('');
 
   return `
     <div class="mission-card history-group-card has-neutral-bar" id="${cardId}" data-group-key="${groupKey}">
@@ -1766,7 +1754,7 @@ function renderHistoryCard(groupLabel, items, groupKey) {
             ${items.length}
           </span>
         </div>
-        <div class="mission-pages">${visibleChips}${overflowHtml}</div>
+        <div class="mission-pages history-group-scroll" role="region" aria-label="${escapeHtml(groupLabel)} 历史记录" tabindex="0">${historyChips}</div>
       </div>
     </div>`;
 }
@@ -3014,11 +3002,17 @@ function findTabSearchMatches(query, tabs = openTabs) {
     }
     return { ...tab, searchDomain: domain, searchScore: score };
   }).filter(Boolean).sort((a, b) => {
-    const sourceRank = source => source.searchSources?.includes('open') ? 3
-      : source.searchSources?.includes('bookmark') ? 2
-      : 1;
+    const sourceRank = source => getSearchSourceMeta(source.searchSources).rank;
+    const rankDifference = sourceRank(b) - sourceRank(a);
+    if (rankDifference) return rankDifference;
+
+    if (sourceRank(a) === 1) {
+      return (b.lastVisitTime || 0) - (a.lastVisitTime || 0) ||
+        b.searchScore - a.searchScore ||
+        String(a.title).localeCompare(String(b.title));
+    }
+
     return b.searchScore - a.searchScore ||
-      sourceRank(b) - sourceRank(a) ||
       (b.lastVisitTime || 0) - (a.lastVisitTime || 0) ||
       String(a.title).localeCompare(String(b.title));
   });
@@ -3062,10 +3056,10 @@ async function getTabSearchCandidates() {
   return buildTabSearchCandidates({ tabs: openTabs, history, bookmarks });
 }
 
-function getSearchSourceLabel(sources) {
-  if (sources?.includes('open')) return '打开标签';
-  if (sources?.includes('bookmark')) return '收藏';
-  return '历史';
+function getSearchSourceMeta(sources) {
+  if (sources?.includes('open')) return { label: '打开标签', className: 'tab-search-source-open', rank: 3 };
+  if (sources?.includes('bookmark')) return { label: '收藏', className: 'tab-search-source-bookmark', rank: 2 };
+  return { label: '历史', className: 'tab-search-source-history', rank: 1 };
 }
 
 function getSearchResultFaviconUrl(tab) {
@@ -3102,6 +3096,7 @@ async function renderTabSearchResults(query) {
 
   resultsEl.innerHTML = matches.map((tab, index) => {
     const faviconUrl = getSearchResultFaviconUrl(tab);
+    const sourceMeta = getSearchSourceMeta(tab.searchSources);
     return `
     <div class="tab-search-result${index === 0 ? ' is-selected' : ''}" data-search-url="${escapeHtml(tab.url)}"${tab.id != null ? ` data-tab-id="${escapeHtml(tab.id)}"` : ''} role="option" aria-selected="${index === 0 ? 'true' : 'false'}">
       <button class="tab-search-result-main" data-action="open-search-result" data-search-url="${escapeHtml(tab.url)}">
@@ -3110,7 +3105,7 @@ async function renderTabSearchResults(query) {
           <span class="tab-search-result-title">${escapeHtml(tab.title || tab.url)}</span>
           <span class="tab-search-result-meta">
             <span class="tab-search-result-url">${escapeHtml(tab.searchDomain || tab.url)}</span>
-            <span class="tab-search-result-source">${getSearchSourceLabel(tab.searchSources)}</span>
+            <span class="tab-search-result-source ${sourceMeta.className}">${sourceMeta.label}</span>
           </span>
         </span>
       </button>

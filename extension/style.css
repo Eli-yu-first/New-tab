@@ -83,6 +83,8 @@ header {
 
 /* ---- Top Search Bar ---- */
 .top-search-bar {
+  position: relative;
+  z-index: 80;
   margin-bottom: 24px;
   padding-bottom: 16px;
   border-bottom: 1px solid var(--warm-gray);
@@ -313,6 +315,7 @@ header {
 
 .section-search {
   margin-left: auto;
+  z-index: 1;
 }
 
 .add-bookmark-btn {
@@ -410,6 +413,7 @@ header {
 
 .tab-search-shell {
   position: relative;
+  z-index: 1;
 }
 
 .tab-search-results {
@@ -424,7 +428,7 @@ header {
   border-radius: 8px;
   box-shadow: 0 12px 28px var(--shadow);
   padding: 4px;
-  z-index: 30;
+  z-index: 81;
 }
 
 .tab-search-result {

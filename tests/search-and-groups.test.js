@@ -84,6 +84,7 @@ function loadApp({ deferred = [], groups = [], tabs = [], bookmarks = [], fetchI
     getDashboardWeatherPresentation,
     formatDashboardTemperatureRange,
     fetchDashboardWeather,
+    isFrequentlyUsedBookmark,
     renderSimpleCard,
     buildSavedTabGroups,
     createSavedTabGroup,
@@ -192,14 +193,21 @@ test('dashboard weather falls back to IP location when browser geolocation is un
   assert.match(requests[1], /longitude=121.4737/);
 });
 
-test('bookmark rows display the green common-use label without adding it to other cards', () => {
+test('only the requested frequent bookmarks display the green common-use label', () => {
   const { helpers } = loadApp();
-  const items = [{ title: 'Project repository', url: 'https://github.com/acme/project' }];
+  const items = [
+    { title: 'Github', url: 'https://github.com/Eli-yu-first/New-tab' },
+    { title: 'ChatGPT', url: 'https://chatgpt.com/' },
+    { title: '豆包', url: 'https://www.doubao.com/' },
+    { title: 'ilovepdf', url: 'https://www.ilovepdf.com/' },
+    { title: '清华info', url: 'https://info.tsinghua.edu.cn/' },
+    { title: 'Kimi', url: 'https://kimi.moonshot.cn/' },
+    { title: 'Project repository', url: 'https://example.test/project' },
+  ];
+  const bookmarksMarkup = helpers.renderSimpleCard('Bookmarks', items, 'bookmarks');
 
-  assert.match(
-    helpers.renderSimpleCard('Bookmarks', items, 'bookmarks'),
-    /<span class="bookmark-common-tag">常用<\/span>/
-  );
+  assert.equal((bookmarksMarkup.match(/bookmark-common-tag/g) || []).length, 6);
+  assert.equal(helpers.isFrequentlyUsedBookmark(items.at(-1)), false);
   assert.doesNotMatch(
     helpers.renderSimpleCard('History', items, 'history'),
     /bookmark-common-tag/

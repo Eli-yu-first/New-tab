@@ -49,6 +49,17 @@ const DASHBOARD_WEATHER_CACHE_KEY = 'dashboardWeatherCache';
 const DASHBOARD_WEATHER_FAILURE_KEY = 'dashboardWeatherFailureAt';
 const DASHBOARD_WEATHER_CACHE_TTL_MS = 6 * 60 * 60 * 1000;
 const DASHBOARD_WEATHER_FAILURE_COOLDOWN_MS = 30 * 60 * 1000;
+const FREQUENT_BOOKMARK_HOSTNAMES = [
+  'github.com',
+  'chatgpt.com',
+  'chat.openai.com',
+  'doubao.com',
+  'ilovepdf.com',
+  'info.tsinghua.edu.cn',
+  'kimi.com',
+  'moonshot.cn',
+];
+const FREQUENT_BOOKMARK_TITLES = new Set(['github', 'chatgpt', '豆包', 'ilovepdf', '清华info', 'kimi']);
 let dashboardWeatherLoadInProgress = false;
 
 function escapeHtml(value) {
@@ -59,6 +70,18 @@ function escapeHtml(value) {
     '"': '&quot;',
     "'": '&#39;',
   })[char]);
+}
+
+function isFrequentlyUsedBookmark(bookmark) {
+  const title = String(bookmark?.title || '').trim().toLowerCase();
+  if (FREQUENT_BOOKMARK_TITLES.has(title)) return true;
+
+  try {
+    const hostname = new URL(bookmark?.url || '').hostname.toLowerCase();
+    return FREQUENT_BOOKMARK_HOSTNAMES.some(domain => hostname === domain || hostname.endsWith(`.${domain}`));
+  } catch {
+    return false;
+  }
 }
 
 function getSystemTimeZone() {
@@ -1653,7 +1676,7 @@ function renderSimpleCard(title, items, sectionType) {
     return `<div class="page-chip clickable${extraClass}"${draggableAttr} data-action="focus-tab" data-tab-url="${safeUrl}" title="${safeTitle}" data-index="${index}">
       ${faviconUrl ? `<img class="chip-favicon" src="${faviconUrl}" alt="" onerror="this.style.display='none'">` : ''}
       <span class="chip-text">${escapeHtml(label)}</span>
-      ${isBookmarks ? '<span class="bookmark-common-tag">常用</span>' : ''}
+      ${isBookmarks && isFrequentlyUsedBookmark(item) ? '<span class="bookmark-common-tag">常用</span>' : ''}
       <div class="chip-actions">
         ${isBookmarks ? '' : `<button class="chip-action chip-save" data-action="bookmark-single-tab" data-tab-url="${safeUrl}" data-tab-title="${safeTitle}" title="Add to bookmarks">
           <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M17.593 3.322c1.1.128 1.907 1.077 1.907 2.185V21L12 17.25 4.5 21V5.507c0-1.108.806-2.057 1.907-2.185a48.507 48.507 0 0 1 11.186 0Z" /></svg>

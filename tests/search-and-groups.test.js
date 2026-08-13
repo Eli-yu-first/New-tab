@@ -80,7 +80,7 @@ test('tab search ranks a title match ahead of a URL-only match', () => {
     { id: 2, title: 'Overview', url: 'https://example.test/project' },
   ]);
 
-  assert.deepEqual(matches.map(tab => tab.id), [1, 2]);
+  assert.deepEqual(Array.from(matches, tab => tab.id), [1, 2]);
 });
 
 test('saved tabs stay in named fixed groups and unknown groups fall back to ungrouped', () => {
@@ -92,8 +92,18 @@ test('saved tabs stay in named fixed groups and unknown groups fall back to ungr
   ], [{ id: 'project-a', name: 'Project A' }]);
 
   assert.equal(grouped[0].name, 'Project A');
-  assert.deepEqual(grouped[0].tabs.map(tab => tab.id), ['a']);
-  assert.deepEqual(grouped.at(-1).tabs.map(tab => tab.id), ['b', 'c']);
+  assert.deepEqual(Array.from(grouped[0].tabs, tab => tab.id), ['a']);
+  assert.deepEqual(Array.from(grouped.at(-1).tabs, tab => tab.id), ['b', 'c']);
+});
+
+test('creating a saved group persists its fixed-group metadata', async () => {
+  const { helpers, syncData } = loadApp();
+
+  const group = await helpers.createSavedTabGroup('Project A');
+
+  assert.equal(group.name, 'Project A');
+  assert.equal(syncData.tabOut_savedTabGroups.length, 1);
+  assert.equal(syncData.tabOut_savedTabGroups[0].id, group.id);
 });
 
 test('moving a saved tab into a group persists the assignment', async () => {

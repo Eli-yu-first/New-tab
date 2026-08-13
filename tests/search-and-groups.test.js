@@ -84,6 +84,7 @@ function loadApp({ deferred = [], groups = [], tabs = [], bookmarks = [], fetchI
     getDashboardWeatherPresentation,
     formatDashboardTemperatureRange,
     fetchDashboardWeather,
+    renderSimpleCard,
     buildSavedTabGroups,
     createSavedTabGroup,
     moveSavedTabToGroup,
@@ -189,6 +190,20 @@ test('dashboard weather falls back to IP location when browser geolocation is un
   assert.match(requests[1], /^https:\/\/api\.open-meteo\.com\/v1\/forecast\?/);
   assert.match(requests[1], /latitude=31.2304/);
   assert.match(requests[1], /longitude=121.4737/);
+});
+
+test('bookmark rows display the green common-use label without adding it to other cards', () => {
+  const { helpers } = loadApp();
+  const items = [{ title: 'Project repository', url: 'https://github.com/acme/project' }];
+
+  assert.match(
+    helpers.renderSimpleCard('Bookmarks', items, 'bookmarks'),
+    /<span class="bookmark-common-tag">常用<\/span>/
+  );
+  assert.doesNotMatch(
+    helpers.renderSimpleCard('History', items, 'history'),
+    /bookmark-common-tag/
+  );
 });
 
 test('tab search ranks a title match ahead of a URL-only match', () => {

@@ -786,6 +786,19 @@ header {
   overflow: hidden;
 }
 
+.bookmark-common-tag {
+  flex-shrink: 0;
+  padding: 2px 6px;
+  border: 1px solid rgba(90, 122, 98, 0.2);
+  border-radius: 4px;
+  background: rgba(90, 122, 98, 0.1);
+  color: var(--accent-sage);
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
 /* Duplicate badge */
 .chip-dupe-badge {
   color: var(--accent-amber);

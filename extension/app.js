@@ -1653,6 +1653,7 @@ function renderSimpleCard(title, items, sectionType) {
     return `<div class="page-chip clickable${extraClass}"${draggableAttr} data-action="focus-tab" data-tab-url="${safeUrl}" title="${safeTitle}" data-index="${index}">
       ${faviconUrl ? `<img class="chip-favicon" src="${faviconUrl}" alt="" onerror="this.style.display='none'">` : ''}
       <span class="chip-text">${escapeHtml(label)}</span>
+      ${isBookmarks ? '<span class="bookmark-common-tag">常用</span>' : ''}
       <div class="chip-actions">
         ${isBookmarks ? '' : `<button class="chip-action chip-save" data-action="bookmark-single-tab" data-tab-url="${safeUrl}" data-tab-title="${safeTitle}" title="Add to bookmarks">
           <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M17.593 3.322c1.1.128 1.907 1.077 1.907 2.185V21L12 17.25 4.5 21V5.507c0-1.108.806-2.057 1.907-2.185a48.507 48.507 0 0 1 11.186 0Z" /></svg>

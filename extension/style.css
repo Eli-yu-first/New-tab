@@ -444,6 +444,9 @@ header {
 }
 
 .tab-search-result-main {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   min-width: 0;
   flex: 1;
   border: 0;
@@ -452,6 +455,18 @@ header {
   padding: 7px 8px;
   text-align: left;
   cursor: pointer;
+}
+
+.tab-search-result-favicon {
+  width: 16px;
+  height: 16px;
+  flex: 0 0 16px;
+  object-fit: contain;
+}
+
+.tab-search-result-copy {
+  min-width: 0;
+  flex: 1;
 }
 
 .tab-search-result-title,

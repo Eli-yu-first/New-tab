@@ -2762,6 +2762,16 @@ function getSearchSourceLabel(sources) {
   return '历史';
 }
 
+function getSearchResultFaviconUrl(tab) {
+  const existingFavicon = String(tab?.favIconUrl || '');
+  if (/^(https?:|data:image\/)/i.test(existingFavicon)) return existingFavicon;
+
+  const domain = getTabSearchDomain(tab?.url);
+  return domain
+    ? `https://www.google.com/s2/favicons?domain=${encodeURIComponent(domain)}&sz=32`
+    : '';
+}
+
 let tabSearchRenderRequestId = 0;
 
 async function renderTabSearchResults(query) {
@@ -2784,19 +2794,25 @@ async function renderTabSearchResults(query) {
     return;
   }
 
-  resultsEl.innerHTML = matches.map((tab, index) => `
+  resultsEl.innerHTML = matches.map((tab, index) => {
+    const faviconUrl = getSearchResultFaviconUrl(tab);
+    return `
     <div class="tab-search-result${index === 0 ? ' is-selected' : ''}" data-search-url="${escapeHtml(tab.url)}"${tab.id != null ? ` data-tab-id="${escapeHtml(tab.id)}"` : ''} role="option" aria-selected="${index === 0 ? 'true' : 'false'}">
       <button class="tab-search-result-main" data-action="open-search-result" data-search-url="${escapeHtml(tab.url)}">
-        <span class="tab-search-result-title">${escapeHtml(tab.title || tab.url)}</span>
-        <span class="tab-search-result-meta">
-          <span class="tab-search-result-url">${escapeHtml(tab.searchDomain || tab.url)}</span>
-          <span class="tab-search-result-source">${getSearchSourceLabel(tab.searchSources)}</span>
+        ${faviconUrl ? `<img class="tab-search-result-favicon" src="${escapeHtml(faviconUrl)}" alt="" onerror="this.style.display='none'">` : ''}
+        <span class="tab-search-result-copy">
+          <span class="tab-search-result-title">${escapeHtml(tab.title || tab.url)}</span>
+          <span class="tab-search-result-meta">
+            <span class="tab-search-result-url">${escapeHtml(tab.searchDomain || tab.url)}</span>
+            <span class="tab-search-result-source">${getSearchSourceLabel(tab.searchSources)}</span>
+          </span>
         </span>
       </button>
       ${tab.id != null ? `<button class="tab-search-result-close" data-action="close-search-tab" data-tab-id="${escapeHtml(tab.id)}" title="Close tab" aria-label="Close tab">
         <svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" /></svg>
       </button>` : ''}
-    </div>`).join('');
+    </div>`;
+  }).join('');
   resultsEl.hidden = false;
   document.getElementById('tabSearchInput')?.setAttribute('aria-expanded', 'true');
 }

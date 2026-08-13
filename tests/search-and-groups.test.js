@@ -63,6 +63,7 @@ function loadApp({ deferred = [], groups = [], tabs = [] } = {}) {
   vm.runInNewContext(`${appSource}\nglobalThis.__featureTest = {
     findTabSearchMatches,
     buildTabSearchCandidates,
+    getSearchResultFaviconUrl,
     isImeComposing,
     buildSavedTabGroups,
     createSavedTabGroup,
@@ -122,6 +123,20 @@ test('tab search candidates merge duplicate URLs and preserve all sources', () =
 
   assert.equal(candidates.length, 1);
   assert.deepEqual(Array.from(candidates[0].searchSources), ['open', 'history', 'bookmark']);
+});
+
+test('search results reuse a tab favicon and otherwise derive one from the domain', () => {
+  const { helpers } = loadApp();
+
+  assert.equal(
+    helpers.getSearchResultFaviconUrl({ url: 'https://github.com/acme/project', favIconUrl: 'https://assets.example.test/github.png' }),
+    'https://assets.example.test/github.png'
+  );
+  assert.equal(
+    helpers.getSearchResultFaviconUrl({ url: 'https://github.com/acme/project' }),
+    'https://www.google.com/s2/favicons?domain=github.com&sz=32'
+  );
+  assert.equal(helpers.getSearchResultFaviconUrl({ url: 'not a URL' }), '');
 });
 
 test('IME composition Enter is not treated as a search submission', () => {

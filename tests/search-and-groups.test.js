@@ -76,6 +76,8 @@ function loadApp({ deferred = [], groups = [], tabs = [], bookmarks = [] } = {})
     buildTabSearchCandidates,
     getSearchResultFaviconUrl,
     isImeComposing,
+    formatDashboardClock,
+    getEffectiveClockTimeZone,
     buildSavedTabGroups,
     createSavedTabGroup,
     moveSavedTabToGroup,
@@ -97,6 +99,22 @@ test('tab search matches title, full URL, and domain with separated fuzzy terms'
 
   assert.equal(matches.length, 1);
   assert.equal(matches[0].id, 1);
+});
+
+test('dashboard clock renders two-line date and time in the selected time zone', () => {
+  const { helpers } = loadApp();
+  const clock = helpers.formatDashboardClock(new Date('2026-08-13T00:05:06.000Z'), 'Asia/Shanghai');
+
+  assert.equal(clock.date, '2026年08月13日');
+  assert.equal(clock.time, '08:05:06');
+  assert.equal(clock.timeZone, 'Asia/Shanghai');
+});
+
+test('dashboard clock uses the system time zone for automatic and invalid settings', () => {
+  const { helpers } = loadApp();
+  const systemTimeZone = helpers.getEffectiveClockTimeZone('auto');
+
+  assert.equal(helpers.getEffectiveClockTimeZone('not/a-time-zone'), systemTimeZone);
 });
 
 test('tab search ranks a title match ahead of a URL-only match', () => {

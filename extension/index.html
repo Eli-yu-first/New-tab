@@ -19,6 +19,10 @@
        TOP SEARCH BAR — search with Google, Microsoft, or Baidu
        ================================================================ -->
   <div class="top-search-bar" id="topSearchBar" style="position: relative;">
+    <div class="dashboard-clock" aria-live="polite">
+      <div class="dashboard-clock-date" id="dashboardClockDate">----年--月--日</div>
+      <div class="dashboard-clock-time" id="dashboardClockTime">--:--:--</div>
+    </div>
     <div class="search-container">
       <div class="custom-dropdown" id="customSearchDropdown">
         <div class="dropdown-trigger" id="dropdownTrigger">
@@ -282,10 +286,23 @@
         </div>
       </div>
     </div>
-    
-    <!-- Placeholder for future settings -->
-    <div class="settings-section settings-future-placeholder">
-      <p style="text-align: center; color: var(--muted); font-size: 11px; margin-top: 30px;" id="settingFutureText">✨ 更多高定设置功能将陆续上线</p>
+
+    <!-- Section 3: Clock time zone -->
+    <div class="settings-section">
+      <label class="settings-item-title" id="settingTimezoneTitle" for="settingTimezone">时区</label>
+      <select id="settingTimezone" class="settings-select">
+        <option value="auto">自动（系统时区）</option>
+        <option value="UTC">UTC</option>
+        <option value="Asia/Shanghai">Asia/Shanghai</option>
+        <option value="Asia/Tokyo">Asia/Tokyo</option>
+        <option value="Asia/Singapore">Asia/Singapore</option>
+        <option value="Europe/London">Europe/London</option>
+        <option value="Europe/Paris">Europe/Paris</option>
+        <option value="America/New_York">America/New_York</option>
+        <option value="America/Chicago">America/Chicago</option>
+        <option value="America/Los_Angeles">America/Los_Angeles</option>
+      </select>
+      <p class="settings-item-desc" id="settingTimezoneDesc">自动模式使用浏览器系统时区。</p>
     </div>
   </div>
 </div>

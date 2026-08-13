@@ -85,6 +85,7 @@ header {
 .top-search-bar {
   position: relative;
   z-index: 80;
+  min-height: 56px;
   margin-bottom: 24px;
   padding-bottom: 16px;
   border-bottom: 1px solid var(--warm-gray);
@@ -96,6 +97,32 @@ header {
   gap: 8px;
   max-width: 600px;
   margin: 0 auto;
+}
+
+.dashboard-clock {
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  min-width: 176px;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
+}
+
+.dashboard-clock-date {
+  font-size: 12px;
+  line-height: 1.25;
+  color: var(--muted);
+}
+
+.dashboard-clock-time {
+  margin-top: 2px;
+  font-family: 'Newsreader', serif;
+  font-size: 24px;
+  font-weight: 400;
+  line-height: 1;
+  color: var(--ink);
 }
 
 .search-engine-select {
@@ -1948,6 +1975,48 @@ footer { animation: fadeUp 0.5s ease 0.65s both; }
   color: var(--muted);
   line-height: 1.5;
   margin: 0;
+}
+
+.settings-select {
+  width: 100%;
+  min-height: 36px;
+  padding: 7px 10px;
+  border: 1px solid var(--warm-gray);
+  border-radius: 6px;
+  background: var(--card-bg);
+  color: var(--ink);
+  font: inherit;
+  font-size: 12px;
+  outline: none;
+}
+
+.settings-select:focus {
+  border-color: var(--accent-sage);
+  box-shadow: 0 0 0 3px rgba(90, 122, 98, 0.1);
+}
+
+@media (max-width: 1180px) {
+  .top-search-bar {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 12px;
+    min-height: 0;
+    padding-top: 0;
+  }
+
+  .dashboard-clock {
+    position: static;
+    order: -1;
+    width: 100%;
+    text-align: center;
+    transform: none;
+  }
+
+  .section-search {
+    position: static !important;
+    transform: none !important;
+  }
 }
 
 /* Switch Toggle Styling */

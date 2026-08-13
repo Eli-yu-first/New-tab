@@ -36,6 +36,8 @@ let nativePort = null;
 // 缓存接收到的全端数据（含历史和打开标签页）
 let sharedNativeData = { bookmarks: [], deferred: [], savedTabGroups: [], openTabs: {}, history: [], historyDeletions: [] };
 let currentLanguage = 'zh';
+let dashboardClockTimeZone = 'auto';
+let dashboardClockTimer = null;
 let activeContextBookmarkIndex = null;
 let isEditMode = false;
 let savedGroupEditingId = null;
@@ -51,6 +53,69 @@ function escapeHtml(value) {
     '"': '&quot;',
     "'": '&#39;',
   })[char]);
+}
+
+function getSystemTimeZone() {
+  return Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+}
+
+function getEffectiveClockTimeZone(timeZone = dashboardClockTimeZone) {
+  if (!timeZone || timeZone === 'auto') return getSystemTimeZone();
+  try {
+    new Intl.DateTimeFormat('en-US', { timeZone });
+    return timeZone;
+  } catch {
+    return getSystemTimeZone();
+  }
+}
+
+function formatDashboardClock(date = new Date(), timeZone = dashboardClockTimeZone) {
+  const effectiveTimeZone = getEffectiveClockTimeZone(timeZone);
+  const parts = new Intl.DateTimeFormat('en-US', {
+    calendar: 'gregory',
+    numberingSystem: 'latn',
+    timeZone: effectiveTimeZone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hourCycle: 'h23',
+  }).formatToParts(date).reduce((result, part) => {
+    result[part.type] = part.value;
+    return result;
+  }, {});
+
+  return {
+    date: `${parts.year}年${parts.month}月${parts.day}日`,
+    time: `${parts.hour}:${parts.minute}:${parts.second}`,
+    timeZone: effectiveTimeZone,
+  };
+}
+
+function updateDashboardClock() {
+  const dateEl = document.getElementById('dashboardClockDate');
+  const timeEl = document.getElementById('dashboardClockTime');
+  if (!dateEl || !timeEl) return;
+
+  const formatted = formatDashboardClock();
+  dateEl.textContent = formatted.date;
+  timeEl.textContent = formatted.time;
+}
+
+function setDashboardClockTimeZone(timeZone) {
+  dashboardClockTimeZone = timeZone || 'auto';
+  updateDashboardClock();
+}
+
+function setupDashboardClock() {
+  chrome.storage.local.get(['dashboardClockTimeZone'], result => {
+    setDashboardClockTimeZone(result.dashboardClockTimeZone || 'auto');
+  });
+  updateDashboardClock();
+  if (dashboardClockTimer) clearInterval(dashboardClockTimer);
+  dashboardClockTimer = setInterval(updateDashboardClock, 1000);
 }
 
 function isTrackableTabUrl(url) {
@@ -2848,6 +2913,7 @@ function clearTabSearch() {
 
 document.addEventListener('DOMContentLoaded', () => {
   setupNativePort();
+  setupDashboardClock();
   renderDashboard();
   setupSearchHandlers();
   setupCustomDropdown();
@@ -3018,6 +3084,9 @@ const LANG_DICT = {
     settingSingletonTitle: "标签单例模式",
     settingSingletonDesc: "开启后，点击新建标签页时若已有打开的空白页，将自动飞跃跳转过去，防止多开重复新标签，节省系统内存。",
     settingLangTitle: "界面语言",
+    settingTimezoneTitle: "时区",
+    settingTimezoneDesc: "自动模式使用浏览器系统时区。",
+    settingTimezoneAuto: "自动（系统时区）",
     settingFutureText: "✨ 更多高定设置功能将陆续上线",
     tabSearchPlaceholder: "搜索标签页...",
     webSearchPlaceholder: "输入网址或搜索内容...",
@@ -3044,6 +3113,9 @@ const LANG_DICT = {
     settingSingletonTitle: "Single-Instance Tab",
     settingSingletonDesc: "When enabled, newly created blank tabs will automatically redirect to any existing open blank tab to prevent duplication and save memory.",
     settingLangTitle: "Interface Language",
+    settingTimezoneTitle: "Time zone",
+    settingTimezoneDesc: "Automatic uses your browser's system time zone.",
+    settingTimezoneAuto: "Automatic (system time zone)",
     settingFutureText: "✨ More high-end settings coming soon",
     tabSearchPlaceholder: "Search tabs...",
     webSearchPlaceholder: "Search the web...",
@@ -3070,6 +3142,9 @@ const LANG_DICT = {
     settingSingletonTitle: "シングルタブモード",
     settingSingletonDesc: "有効にすると、新しく作成された空のタブは、重複を防ぎメモリを節約するために、既存の開いている空のタブに自动的にリダイレクトされます。",
     settingLangTitle: "表示言語",
+    settingTimezoneTitle: "タイムゾーン",
+    settingTimezoneDesc: "自動ではブラウザのシステムタイムゾーンを使用します。",
+    settingTimezoneAuto: "自動（システムのタイムゾーン）",
     settingFutureText: "✨ さらに多くの高級設定がまもなく登場します",
     tabSearchPlaceholder: "タブを検索...",
     webSearchPlaceholder: "ウェブを検索...",
@@ -3112,6 +3187,13 @@ function applyLanguage(lang) {
 
   const settingLangTitle = document.getElementById('settingLangTitle');
   if (settingLangTitle) settingLangTitle.textContent = dict.settingLangTitle;
+
+  const settingTimezoneTitle = document.getElementById('settingTimezoneTitle');
+  if (settingTimezoneTitle) settingTimezoneTitle.textContent = dict.settingTimezoneTitle;
+  const settingTimezoneDesc = document.getElementById('settingTimezoneDesc');
+  if (settingTimezoneDesc) settingTimezoneDesc.textContent = dict.settingTimezoneDesc;
+  const settingTimezoneAuto = document.querySelector('#settingTimezone option[value="auto"]');
+  if (settingTimezoneAuto) settingTimezoneAuto.textContent = dict.settingTimezoneAuto;
 
   const settingFutureText = document.getElementById('settingFutureText');
   if (settingFutureText) settingFutureText.textContent = dict.settingFutureText;
@@ -3178,6 +3260,7 @@ function setupSettingsDrawer() {
   const settingsOverlay = document.getElementById('settingsOverlay');
   const settingsCloseBtn = document.getElementById('settingsCloseBtn');
   const singletonCheck = document.getElementById('settingSingletonCheck');
+  const timezoneSelect = document.getElementById('settingTimezone');
   const langCards = document.querySelectorAll('.language-card');
 
   if (!settingsBtn || !settingsDrawer || !settingsOverlay || !settingsCloseBtn) return;
@@ -3211,7 +3294,19 @@ function setupSettingsDrawer() {
     });
   }
 
-  // 4. 多语言选择初始化与监听
+  // 4. 时区选择初始化与监听
+  if (timezoneSelect) {
+    chrome.storage.local.get(['dashboardClockTimeZone'], result => {
+      timezoneSelect.value = result.dashboardClockTimeZone || 'auto';
+    });
+    timezoneSelect.addEventListener('change', event => {
+      const timeZone = event.target.value;
+      setDashboardClockTimeZone(timeZone);
+      chrome.storage.local.set({ dashboardClockTimeZone: timeZone });
+    });
+  }
+
+  // 5. 多语言选择初始化与监听
   chrome.storage.local.get(['language'], (res) => {
     const currentLang = res.language || 'zh';
     applyLanguage(currentLang);

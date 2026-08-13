@@ -472,25 +472,16 @@ async function closeTabsExact(urls) {
 /**
  * focusTab(url)
  *
- * Switches Chrome to the tab with the given URL (exact match first,
- * then hostname fallback). If no match is found, creates a new tab.
+ * Switches Chrome to a tab only when its full URL matches. Different pages on
+ * the same domain must open independently, otherwise a GitHub repository,
+ * issue, or settings page can be mistaken for an already-open tab.
  */
 async function focusTab(url) {
   if (!url) return;
   const allTabs = await chrome.tabs.query({});
   const currentWindow = await chrome.windows.getCurrent();
 
-  let matches = allTabs.filter(t => t.url === url);
-
-  if (matches.length === 0) {
-    try {
-      const targetHost = new URL(url).hostname;
-      matches = allTabs.filter(t => {
-        try { return new URL(t.url).hostname === targetHost; }
-        catch { return false; }
-      });
-    } catch {}
-  }
+  const matches = allTabs.filter(t => t.url === url);
 
   // 如果没有找到任何匹配的已打开页面，直接在新标签页中打开该链接
   if (matches.length === 0) {

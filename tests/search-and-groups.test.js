@@ -8,12 +8,13 @@ const vm = require('node:vm');
 
 const appSource = fs.readFileSync(path.join(__dirname, '..', 'extension', 'app.js'), 'utf8');
 
-function loadApp({ deferred = [], groups = [] } = {}) {
+function loadApp({ deferred = [], groups = [], tabs = [] } = {}) {
   const syncData = {
     deferred,
     tabOut_savedTabGroups: groups,
   };
   const writes = [];
+  const tabCalls = { created: [], updated: [], focusedWindows: [] };
   const context = {
     URL,
     console,
@@ -29,6 +30,15 @@ function loadApp({ deferred = [], groups = [] } = {}) {
     window: {},
     chrome: {
       runtime: { id: 'test-extension' },
+      tabs: {
+        query: async () => tabs,
+        create: async value => { tabCalls.created.push(value); },
+        update: async (id, value) => { tabCalls.updated.push([id, value]); },
+      },
+      windows: {
+        getCurrent: async () => ({ id: 1 }),
+        update: async (id, value) => { tabCalls.focusedWindows.push([id, value]); },
+      },
       storage: {
         sync: {
           get: async keys => {
@@ -55,9 +65,10 @@ function loadApp({ deferred = [], groups = [] } = {}) {
     buildSavedTabGroups,
     createSavedTabGroup,
     moveSavedTabToGroup,
+    focusTab,
   };`, context);
 
-  return { helpers: context.__featureTest, syncData, writes };
+  return { helpers: context.__featureTest, syncData, writes, tabCalls };
 }
 
 test('tab search matches title, full URL, and domain with separated fuzzy terms', () => {
@@ -81,6 +92,34 @@ test('tab search ranks a title match ahead of a URL-only match', () => {
   ]);
 
   assert.deepEqual(Array.from(matches, tab => tab.id), [1, 2]);
+});
+
+test('focusing a different URL on the same domain opens that specific URL', async () => {
+  const { helpers, tabCalls } = loadApp({
+    tabs: [{ id: 1, url: 'https://github.com/acme/one', windowId: 1 }],
+  });
+
+  await helpers.focusTab('https://github.com/acme/two');
+
+  assert.equal(tabCalls.created.length, 1);
+  assert.equal(tabCalls.created[0].url, 'https://github.com/acme/two');
+  assert.equal(tabCalls.updated.length, 0);
+});
+
+test('focusing the same full URL still activates its existing tab', async () => {
+  const { helpers, tabCalls } = loadApp({
+    tabs: [{ id: 7, url: 'https://github.com/acme/one', windowId: 2 }],
+  });
+
+  await helpers.focusTab('https://github.com/acme/one');
+
+  assert.equal(tabCalls.updated.length, 1);
+  assert.equal(tabCalls.updated[0][0], 7);
+  assert.equal(tabCalls.updated[0][1].active, true);
+  assert.equal(tabCalls.focusedWindows.length, 1);
+  assert.equal(tabCalls.focusedWindows[0][0], 2);
+  assert.equal(tabCalls.focusedWindows[0][1].focused, true);
+  assert.equal(tabCalls.created.length, 0);
 });
 
 test('saved tabs stay in named fixed groups and unknown groups fall back to ungrouped', () => {

@@ -7,6 +7,7 @@ const test = require('node:test');
 const vm = require('node:vm');
 
 const appSource = fs.readFileSync(path.join(__dirname, '..', 'extension', 'app.js'), 'utf8');
+const indexHtml = fs.readFileSync(path.join(__dirname, '..', 'extension', 'index.html'), 'utf8');
 
 function loadApp({ deferred = [], groups = [], tabs = [], bookmarks = [], fetchImpl, geolocation } = {}) {
   const syncData = {
@@ -108,6 +109,10 @@ test('tab search matches title, full URL, and domain with separated fuzzy terms'
 
   assert.equal(matches.length, 1);
   assert.equal(matches[0].id, 1);
+});
+
+test('bookmarks column appears before saved-for-later in the dashboard layout', () => {
+  assert.ok(indexHtml.indexOf('id="bookmarksSection"') < indexHtml.indexOf('id="savedTabsSection"'));
 });
 
 test('dashboard clock renders two-line date and time in the selected time zone', () => {

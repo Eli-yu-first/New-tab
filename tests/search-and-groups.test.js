@@ -84,8 +84,9 @@ function loadApp({ deferred = [], groups = [], tabs = [], bookmarks = [], fetchI
     getDashboardWeatherPresentation,
     formatDashboardTemperatureRange,
     fetchDashboardWeather,
-    isFrequentlyUsedBookmark,
+    getBookmarkUsageTag,
     renderSimpleCard,
+    addCustomBookmark,
     buildSavedTabGroups,
     createSavedTabGroup,
     moveSavedTabToGroup,
@@ -193,21 +194,21 @@ test('dashboard weather falls back to IP location when browser geolocation is un
   assert.match(requests[1], /longitude=121.4737/);
 });
 
-test('only the requested frequent bookmarks display the green common-use label', () => {
+test('bookmark usage labels are rendered only from the saved usage level', () => {
   const { helpers } = loadApp();
   const items = [
-    { title: 'Github', url: 'https://github.com/Eli-yu-first/New-tab' },
-    { title: 'ChatGPT', url: 'https://chatgpt.com/' },
-    { title: '豆包', url: 'https://www.doubao.com/' },
-    { title: 'ilovepdf', url: 'https://www.ilovepdf.com/' },
-    { title: '清华info', url: 'https://info.tsinghua.edu.cn/' },
-    { title: 'Kimi', url: 'https://kimi.moonshot.cn/' },
+    { title: 'Github', url: 'https://github.com/Eli-yu-first/New-tab', usageLevel: 'frequent' },
+    { title: 'ChatGPT', url: 'https://chatgpt.com/', usageLevel: 'medium' },
+    { title: '豆包', url: 'https://www.doubao.com/', usageLevel: 'low' },
     { title: 'Project repository', url: 'https://example.test/project' },
   ];
   const bookmarksMarkup = helpers.renderSimpleCard('Bookmarks', items, 'bookmarks');
 
-  assert.equal((bookmarksMarkup.match(/bookmark-common-tag/g) || []).length, 6);
-  assert.equal(helpers.isFrequentlyUsedBookmark(items.at(-1)), false);
+  assert.match(bookmarksMarkup, /bookmark-usage-frequent">常用/);
+  assert.match(bookmarksMarkup, /bookmark-usage-medium">中等/);
+  assert.match(bookmarksMarkup, /bookmark-usage-low">较少/);
+  assert.equal((bookmarksMarkup.match(/bookmark-usage-tag/g) || []).length, 3);
+  assert.equal(helpers.getBookmarkUsageTag(items.at(-1).usageLevel), null);
   assert.doesNotMatch(
     helpers.renderSimpleCard('History', items, 'history'),
     /bookmark-common-tag/
@@ -312,7 +313,17 @@ test('bookmarking an open tab saves it without closing the tab', async () => {
   assert.equal(saved, true);
   assert.equal(syncData.tabOut_customBookmarks.length, 1);
   assert.equal(syncData.tabOut_customBookmarks[0].url, 'https://github.com/acme/project');
+  assert.equal(syncData.tabOut_customBookmarks[0].usageLevel, 'medium');
   assert.equal(tabCalls.removed?.length || 0, 0);
+});
+
+test('new bookmarks persist the usage level selected in the bookmark dialog', async () => {
+  const { helpers, syncData } = loadApp();
+
+  const saved = await helpers.addCustomBookmark('https://example.test/project', 'Project', 'frequent');
+
+  assert.equal(saved, true);
+  assert.equal(syncData.tabOut_customBookmarks[0].usageLevel, 'frequent');
 });
 
 test('saved tabs stay in named fixed groups and unknown groups fall back to ungrouped', () => {

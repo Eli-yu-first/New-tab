@@ -202,9 +202,17 @@
       <label style="display: block; font-size: 12px; color: var(--muted); margin-bottom: 4px;">URL</label>
       <input type="text" id="bookmarkModalUrl" class="search-input" style="width: 100%; box-sizing: border-box;" placeholder="https://example.com" />
     </div>
-    <div style="margin-bottom: 20px;">
+    <div style="margin-bottom: 12px;">
       <label style="display: block; font-size: 12px; color: var(--muted); margin-bottom: 4px;">Title</label>
       <input type="text" id="bookmarkModalTitle" class="search-input" style="width: 100%; box-sizing: border-box;" placeholder="My Bookmark" />
+    </div>
+    <div style="margin-bottom: 20px;">
+      <label for="bookmarkModalUsageLevel" style="display: block; font-size: 12px; color: var(--muted); margin-bottom: 4px;">使用频率</label>
+      <select id="bookmarkModalUsageLevel" class="settings-select">
+        <option value="frequent">常用</option>
+        <option value="medium" selected>中等</option>
+        <option value="low">较少</option>
+      </select>
     </div>
     <div style="display: flex; justify-content: flex-end; gap: 8px;">
       <button id="bookmarkModalCancel" class="action-btn">Cancel</button>

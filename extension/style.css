@@ -786,17 +786,32 @@ header {
   overflow: hidden;
 }
 
-.bookmark-common-tag {
+.bookmark-usage-tag {
   flex-shrink: 0;
   padding: 2px 6px;
-  border: 1px solid rgba(90, 122, 98, 0.2);
   border-radius: 4px;
-  background: rgba(90, 122, 98, 0.1);
-  color: var(--accent-sage);
   font-size: 10px;
   font-weight: 600;
   line-height: 1.2;
   white-space: nowrap;
+}
+
+.bookmark-usage-frequent {
+  border: 1px solid rgba(90, 122, 98, 0.2);
+  background: rgba(90, 122, 98, 0.1);
+  color: var(--accent-sage);
+}
+
+.bookmark-usage-medium {
+  border: 1px solid rgba(184, 137, 46, 0.22);
+  background: rgba(184, 137, 46, 0.1);
+  color: var(--status-cooling);
+}
+
+.bookmark-usage-low {
+  border: 1px solid rgba(90, 107, 122, 0.2);
+  background: rgba(90, 107, 122, 0.1);
+  color: var(--accent-slate);
 }
 
 /* Duplicate badge */

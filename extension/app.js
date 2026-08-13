@@ -49,17 +49,11 @@ const DASHBOARD_WEATHER_CACHE_KEY = 'dashboardWeatherCache';
 const DASHBOARD_WEATHER_FAILURE_KEY = 'dashboardWeatherFailureAt';
 const DASHBOARD_WEATHER_CACHE_TTL_MS = 6 * 60 * 60 * 1000;
 const DASHBOARD_WEATHER_FAILURE_COOLDOWN_MS = 30 * 60 * 1000;
-const FREQUENT_BOOKMARK_HOSTNAMES = [
-  'github.com',
-  'chatgpt.com',
-  'chat.openai.com',
-  'doubao.com',
-  'ilovepdf.com',
-  'info.tsinghua.edu.cn',
-  'kimi.com',
-  'moonshot.cn',
-];
-const FREQUENT_BOOKMARK_TITLES = new Set(['github', 'chatgpt', '豆包', 'ilovepdf', '清华info', 'kimi']);
+const BOOKMARK_USAGE_LEVELS = {
+  frequent: { label: '常用', className: 'bookmark-usage-frequent' },
+  medium: { label: '中等', className: 'bookmark-usage-medium' },
+  low: { label: '较少', className: 'bookmark-usage-low' },
+};
 let dashboardWeatherLoadInProgress = false;
 
 function escapeHtml(value) {
@@ -72,16 +66,13 @@ function escapeHtml(value) {
   })[char]);
 }
 
-function isFrequentlyUsedBookmark(bookmark) {
-  const title = String(bookmark?.title || '').trim().toLowerCase();
-  if (FREQUENT_BOOKMARK_TITLES.has(title)) return true;
+function normalizeBookmarkUsageLevel(usageLevel) {
+  return Object.hasOwn(BOOKMARK_USAGE_LEVELS, usageLevel) ? usageLevel : null;
+}
 
-  try {
-    const hostname = new URL(bookmark?.url || '').hostname.toLowerCase();
-    return FREQUENT_BOOKMARK_HOSTNAMES.some(domain => hostname === domain || hostname.endsWith(`.${domain}`));
-  } catch {
-    return false;
-  }
+function getBookmarkUsageTag(usageLevel) {
+  const normalizedLevel = normalizeBookmarkUsageLevel(usageLevel);
+  return normalizedLevel ? BOOKMARK_USAGE_LEVELS[normalizedLevel] : null;
 }
 
 function getSystemTimeZone() {
@@ -1097,6 +1088,7 @@ async function getBookmarks() {
   return customBookmarks.map(b => ({
     url: b.url,
     title: b.title || b.url,
+    usageLevel: normalizeBookmarkUsageLevel(b.usageLevel),
   }));
 }
 
@@ -1672,11 +1664,12 @@ function renderSimpleCard(title, items, sectionType) {
 
     const draggableAttr = isBookmarks ? ' draggable="true"' : '';
     const extraClass = isBookmarks ? ' bookmark-chip' : '';
+    const usageTag = isBookmarks ? getBookmarkUsageTag(item.usageLevel) : null;
 
     return `<div class="page-chip clickable${extraClass}"${draggableAttr} data-action="focus-tab" data-tab-url="${safeUrl}" title="${safeTitle}" data-index="${index}">
       ${faviconUrl ? `<img class="chip-favicon" src="${faviconUrl}" alt="" onerror="this.style.display='none'">` : ''}
       <span class="chip-text">${escapeHtml(label)}</span>
-      ${isBookmarks && isFrequentlyUsedBookmark(item) ? '<span class="bookmark-common-tag">常用</span>' : ''}
+      ${usageTag ? `<span class="bookmark-usage-tag ${usageTag.className}">${usageTag.label}</span>` : ''}
       <div class="chip-actions">
         ${isBookmarks ? '' : `<button class="chip-action chip-save" data-action="bookmark-single-tab" data-tab-url="${safeUrl}" data-tab-title="${safeTitle}" title="Add to bookmarks">
           <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M17.593 3.322c1.1.128 1.907 1.077 1.907 2.185V21L12 17.25 4.5 21V5.507c0-1.108.806-2.057 1.907-2.185a48.507 48.507 0 0 1 11.186 0Z" /></svg>
@@ -2426,7 +2419,7 @@ async function saveCustomBookmarks(bookmarks) {
   });
 }
 
-async function addCustomBookmark(url, title) {
+async function addCustomBookmark(url, title, usageLevel = 'medium') {
   if (!url) return false;
   try {
     new URL(url);
@@ -2448,6 +2441,7 @@ async function addCustomBookmark(url, title) {
     id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
     url: url,
     title: title || url,
+    usageLevel: normalizeBookmarkUsageLevel(usageLevel) || 'medium',
     createdAt: Date.now(),
   });
 
@@ -2600,8 +2594,10 @@ function setupContextMenu() {
             
             const modalUrl = document.getElementById('bookmarkModalUrl');
             const modalTitle = document.getElementById('bookmarkModalTitle');
+            const modalUsageLevel = document.getElementById('bookmarkModalUsageLevel');
             if (modalUrl) modalUrl.value = item.url;
             if (modalTitle) modalTitle.value = item.title;
+            if (modalUsageLevel) modalUsageLevel.value = normalizeBookmarkUsageLevel(item.usageLevel) || 'medium';
             
             modal.style.display = 'flex';
             modalUrl.focus();
@@ -2659,6 +2655,7 @@ function setupBookmarkButtons() {
   const bookmarkModal = document.getElementById('bookmarkModal');
   const modalUrl = document.getElementById('bookmarkModalUrl');
   const modalTitle = document.getElementById('bookmarkModalTitle');
+  const modalUsageLevel = document.getElementById('bookmarkModalUsageLevel');
   const modalCancel = document.getElementById('bookmarkModalCancel');
   const modalSave = document.getElementById('bookmarkModalSave');
 
@@ -2669,6 +2666,7 @@ function setupBookmarkButtons() {
       if (modalHeader) modalHeader.textContent = 'Add new bookmark';
       modalUrl.value = '';
       modalTitle.value = '';
+      modalUsageLevel.value = 'medium';
       bookmarkModal.style.display = 'flex';
       modalUrl.focus();
     });
@@ -2691,7 +2689,13 @@ function setupBookmarkButtons() {
       if (isEditMode) {
         if (activeContextBookmarkIndex !== null) {
           const bookmarks = await getCustomBookmarks();
-          bookmarks[activeContextBookmarkIndex] = { url, title: title || url };
+          const usageLevel = normalizeBookmarkUsageLevel(modalUsageLevel.value) || 'medium';
+          bookmarks[activeContextBookmarkIndex] = {
+            ...bookmarks[activeContextBookmarkIndex],
+            url,
+            title: title || url,
+            usageLevel,
+          };
           await saveCustomBookmarks(bookmarks);
           showToast('书签已成功修改');
           closeModal();
@@ -2699,7 +2703,7 @@ function setupBookmarkButtons() {
           activeContextBookmarkIndex = null;
         }
       } else {
-        const success = await addCustomBookmark(url, title);
+        const success = await addCustomBookmark(url, title, modalUsageLevel.value);
         if (success) {
           showToast('Bookmark added successfully');
           closeModal();

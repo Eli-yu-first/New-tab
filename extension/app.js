@@ -640,19 +640,6 @@ function buildSavedTabGroups(savedTabs, savedTabGroups) {
   return [...groups, ungrouped];
 }
 
-async function saveTabForLater(tab) {
-  const deferred = await getDeferred();
-  deferred.push({
-    id:        Date.now().toString(),
-    url:       tab.url,
-    title:     tab.title,
-    savedAt:   new Date().toISOString(),
-    completed: false,
-    dismissed: false,
-  });
-  await setDeferred(deferred);
-}
-
 async function getSavedTabs() {
   const deferred = await getDeferred();
   const visible = deferred.filter(t => !t.dismissed);
@@ -1228,7 +1215,7 @@ function buildOverflowChips(hiddenTabs, urlCounts = {}) {
       ${faviconUrl ? `<img class="chip-favicon" src="${faviconUrl}" alt="" onerror="this.style.display='none'">` : ''}
       <span class="chip-text">${escapeHtml(label)}</span>${dupeTag}${remoteBadge}
       <div class="chip-actions">
-        <button class="chip-action chip-save" data-action="defer-single-tab" data-tab-url="${safeUrl}" data-tab-title="${safeTitle}" title="Save for later">
+        <button class="chip-action chip-save" data-action="bookmark-single-tab" data-tab-url="${safeUrl}" data-tab-title="${safeTitle}" title="Add to bookmarks">
           <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M17.593 3.322c1.1.128 1.907 1.077 1.907 2.185V21L12 17.25 4.5 21V5.507c0-1.108.806-2.057 1.907-2.185a48.507 48.507 0 0 1 11.186 0Z" /></svg>
         </button>
         <button class="chip-action chip-close" data-action="close-single-tab" data-tab-url="${safeUrl}" title="Close this tab">
@@ -1313,7 +1300,7 @@ function renderDomainCard(group) {
       ${faviconUrl ? `<img class="chip-favicon" src="${faviconUrl}" alt="" onerror="this.style.display='none'">` : ''}
       <span class="chip-text">${escapeHtml(label)}</span>${dupeTag}${remoteBadge}
       <div class="chip-actions">
-        <button class="chip-action chip-save" data-action="defer-single-tab" data-tab-url="${safeUrl}" data-tab-title="${safeTitle}" title="Save for later">
+        <button class="chip-action chip-save" data-action="bookmark-single-tab" data-tab-url="${safeUrl}" data-tab-title="${safeTitle}" title="Add to bookmarks">
           <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M17.593 3.322c1.1.128 1.907 1.077 1.907 2.185V21L12 17.25 4.5 21V5.507c0-1.108.806-2.057 1.907-2.185a48.507 48.507 0 0 1 11.186 0Z" /></svg>
         </button>
         <button class="chip-action chip-close" data-action="close-single-tab" data-tab-url="${safeUrl}" title="Close this tab">
@@ -1378,7 +1365,7 @@ function renderSimpleCard(title, items, sectionType) {
       ${faviconUrl ? `<img class="chip-favicon" src="${faviconUrl}" alt="" onerror="this.style.display='none'">` : ''}
       <span class="chip-text">${escapeHtml(label)}</span>
       <div class="chip-actions">
-        ${isBookmarks ? '' : `<button class="chip-action chip-save" data-action="defer-single-tab" data-tab-url="${safeUrl}" data-tab-title="${safeTitle}" title="Save for later">
+        ${isBookmarks ? '' : `<button class="chip-action chip-save" data-action="bookmark-single-tab" data-tab-url="${safeUrl}" data-tab-title="${safeTitle}" title="Add to bookmarks">
           <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M17.593 3.322c1.1.128 1.907 1.077 1.907 2.185V21L12 17.25 4.5 21V5.507c0-1.108.806-2.057 1.907-2.185a48.507 48.507 0 0 1 11.186 0Z" /></svg>
         </button>`}
       </div>
@@ -1917,34 +1904,22 @@ document.addEventListener('click', async (e) => {
     return;
   }
 
-  if (action === 'defer-single-tab') {
+  if (action === 'bookmark-single-tab') {
     e.stopPropagation();
     const tabUrl   = actionEl.dataset.tabUrl;
     const tabTitle = actionEl.dataset.tabTitle || tabUrl;
     if (!tabUrl) return;
 
     try {
-      await saveTabForLater({ url: tabUrl, title: tabTitle });
+      const saved = await bookmarkOpenTab({ url: tabUrl, title: tabTitle });
+      if (!saved) return;
     } catch (err) {
-      console.error('[tab-out] Failed to save tab:', err);
-      showToast('Failed to save tab');
+      console.error('[tab-out] Failed to bookmark tab:', err);
+      showToast('Failed to add bookmark');
       return;
     }
 
-    const allTabs = await chrome.tabs.query({});
-    const match   = allTabs.find(t => t.url === tabUrl);
-    if (match) await chrome.tabs.remove(match.id);
-    await fetchOpenTabs();
-
-    const chip = actionEl.closest('.page-chip');
-    if (chip) {
-      chip.style.transition = 'opacity 0.2s, transform 0.2s';
-      chip.style.opacity    = '0';
-      chip.style.transform  = 'scale(0.8)';
-      setTimeout(() => chip.remove(), 200);
-    }
-
-    showToast('Saved for later');
+    showToast('Added to bookmarks');
     await renderDashboard();
     return;
   }
@@ -2165,6 +2140,10 @@ async function addCustomBookmark(url, title) {
 
   await saveCustomBookmarks(bookmarks);
   return true;
+}
+
+async function bookmarkOpenTab(tab) {
+  return addCustomBookmark(tab?.url, tab?.title);
 }
 
 async function deleteCustomBookmark(url) {

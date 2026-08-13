@@ -8,10 +8,11 @@ const vm = require('node:vm');
 
 const appSource = fs.readFileSync(path.join(__dirname, '..', 'extension', 'app.js'), 'utf8');
 
-function loadApp({ deferred = [], groups = [], tabs = [] } = {}) {
+function loadApp({ deferred = [], groups = [], tabs = [], bookmarks = [] } = {}) {
   const syncData = {
     deferred,
     tabOut_savedTabGroups: groups,
+    tabOut_customBookmarks: bookmarks,
   };
   const writes = [];
   const tabCalls = { created: [], updated: [], focusedWindows: [] };
@@ -41,18 +42,28 @@ function loadApp({ deferred = [], groups = [], tabs = [] } = {}) {
       },
       storage: {
         sync: {
-          get: async keys => {
-            if (typeof keys === 'string') return { [keys]: syncData[keys] };
-            if (Array.isArray(keys)) return Object.fromEntries(keys.map(key => [key, syncData[key]]));
-            return { ...syncData };
+          get: (keys, callback) => {
+            const result = typeof keys === 'string'
+              ? { [keys]: syncData[keys] }
+              : Array.isArray(keys)
+                ? Object.fromEntries(keys.map(key => [key, syncData[key]]))
+                : { ...syncData };
+            if (callback) callback(result);
+            return Promise.resolve(result);
           },
-          set: async value => {
+          set: (value, callback) => {
             Object.assign(syncData, value);
             writes.push(value);
+            if (callback) callback();
+            return Promise.resolve();
           },
         },
         local: {
-          get: async () => ({}),
+          get: (keys, callback) => {
+            const result = typeof keys === 'string' ? { [keys]: [] } : {};
+            if (callback) callback(result);
+            return Promise.resolve(result);
+          },
           set: async () => {},
           remove: async () => {},
         },
@@ -68,6 +79,7 @@ function loadApp({ deferred = [], groups = [], tabs = [] } = {}) {
     buildSavedTabGroups,
     createSavedTabGroup,
     moveSavedTabToGroup,
+    bookmarkOpenTab,
     focusTab,
   };`, context);
 
@@ -170,6 +182,22 @@ test('focusing the same full URL still opens a new tab', async () => {
   assert.equal(tabCalls.created[0].url, 'https://github.com/acme/one');
   assert.equal(tabCalls.updated.length, 0);
   assert.equal(tabCalls.focusedWindows.length, 0);
+});
+
+test('bookmarking an open tab saves it without closing the tab', async () => {
+  const { helpers, syncData, tabCalls } = loadApp({
+    tabs: [{ id: 7, url: 'https://github.com/acme/project', windowId: 2 }],
+  });
+
+  const saved = await helpers.bookmarkOpenTab({
+    url: 'https://github.com/acme/project',
+    title: 'Project repository',
+  });
+
+  assert.equal(saved, true);
+  assert.equal(syncData.tabOut_customBookmarks.length, 1);
+  assert.equal(syncData.tabOut_customBookmarks[0].url, 'https://github.com/acme/project');
+  assert.equal(tabCalls.removed?.length || 0, 0);
 });
 
 test('saved tabs stay in named fixed groups and unknown groups fall back to ungrouped', () => {

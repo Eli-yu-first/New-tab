@@ -88,6 +88,7 @@ function loadApp({ deferred = [], groups = [], tabs = [], bookmarks = [], fetchI
     getBookmarkUsageTag,
     renderSimpleCard,
     addCustomBookmark,
+    shouldDismissTabSearchResults,
     buildSavedTabGroups,
     createSavedTabGroup,
     moveSavedTabToGroup,
@@ -111,8 +112,26 @@ test('tab search matches title, full URL, and domain with separated fuzzy terms'
   assert.equal(matches[0].id, 1);
 });
 
-test('bookmarks column appears before saved-for-later in the dashboard layout', () => {
-  assert.ok(indexHtml.indexOf('id="bookmarksSection"') < indexHtml.indexOf('id="savedTabsSection"'));
+test('dashboard columns place bookmarks before history and saved-for-later', () => {
+  const openTabsIndex = indexHtml.indexOf('id="openTabsSection"');
+  const bookmarksIndex = indexHtml.indexOf('id="bookmarksSection"');
+  const historyIndex = indexHtml.indexOf('id="frequentTabsSection"');
+  const savedTabsIndex = indexHtml.indexOf('id="savedTabsSection"');
+
+  assert.ok(openTabsIndex < bookmarksIndex);
+  assert.ok(bookmarksIndex < historyIndex);
+  assert.ok(historyIndex < savedTabsIndex);
+});
+
+test('tab-search suggestions dismiss only when clicking outside their shell', () => {
+  const { helpers } = loadApp();
+  const inside = {};
+  const outside = {};
+  const shell = { contains: target => target === inside };
+
+  assert.equal(helpers.shouldDismissTabSearchResults(inside, shell), false);
+  assert.equal(helpers.shouldDismissTabSearchResults(outside, shell), true);
+  assert.equal(helpers.shouldDismissTabSearchResults(outside, null), false);
 });
 
 test('dashboard clock renders two-line date and time in the selected time zone', () => {

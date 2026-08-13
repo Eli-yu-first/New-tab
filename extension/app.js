@@ -2895,6 +2895,7 @@ function setupSearchHandlers() {
   const searchInput = document.getElementById('searchInput');
   const searchBtn = document.getElementById('searchBtn');
   const tabSearchInput = document.getElementById('tabSearchInput');
+  const tabSearchShell = tabSearchInput?.closest('.tab-search-shell');
   
   if (searchBtn) {
     searchBtn.addEventListener('click', () => {
@@ -2919,6 +2920,11 @@ function setupSearchHandlers() {
       const query = event.target.value.trim();
       if (searchDebounceTimeout) clearTimeout(searchDebounceTimeout);
       searchDebounceTimeout = setTimeout(() => renderTabSearchResults(query), 120);
+    });
+
+    tabSearchInput.addEventListener('focus', () => {
+      const query = tabSearchInput.value.trim();
+      if (query) renderTabSearchResults(query);
     });
 
     tabSearchInput.addEventListener('keydown', async event => {
@@ -2955,6 +2961,10 @@ function setupSearchHandlers() {
       tabSearchInput?.focus();
       tabSearchInput?.select();
     }
+  });
+
+  document.addEventListener('click', event => {
+    if (shouldDismissTabSearchResults(event.target, tabSearchShell)) hideTabSearchResults();
   });
 }
 
@@ -3156,6 +3166,17 @@ function clearTabSearch() {
     results.hidden = true;
     results.innerHTML = '';
   }
+  input?.setAttribute('aria-expanded', 'false');
+}
+
+function shouldDismissTabSearchResults(target, tabSearchShell) {
+  return Boolean(tabSearchShell) && !tabSearchShell.contains(target);
+}
+
+function hideTabSearchResults() {
+  const input = document.getElementById('tabSearchInput');
+  const results = document.getElementById('tabSearchResults');
+  if (results) results.hidden = true;
   input?.setAttribute('aria-expanded', 'false');
 }
 
